@@ -43,6 +43,14 @@ def get_db() -> MySQLConnection:
         return cnx
 
 
+def set_user_alias(user:str, firstname:str, lastname:str):
+    name = f"{firstname} {lastname}"
+    cnx = get_db()
+    cur = cnx.cursor()
+    cur.execute(f"UPDATE kimai2_users SET alias = '{name}' WHERE username = '{user}';")
+    cnx.commit()
+
+
 def set_user_salary(user:str, salary:float) -> int:
     cnx = get_db()
     cur = cnx.cursor()
@@ -51,6 +59,13 @@ def set_user_salary(user:str, salary:float) -> int:
     cur.execute(f"INSERT INTO kimai2_user_preferences(user_id, name, value) VALUES({user_id}, 'hourly_rate', '{salary:.2f}');")
     cnx.commit()
     return user_id
+
+
+def get_project_for_type(usertype:str):
+    cnx = get_db()
+    cur = cnx.cursor()
+    cur.execute(f"SELECT id, customer_id FROM kimai2_projects WHERE name = '{usertype}';")
+    return next(cur)
 
 
 def create_private_team(team_name:str, leader_id:int, user_id:int) -> int:
@@ -65,15 +80,27 @@ def create_private_team(team_name:str, leader_id:int, user_id:int) -> int:
     return team_id
 
 
-def create_private_activity(acti_name:str, team_id:int, budget:float):
+def create_private_activity(proj_id:int, acti_name:str, team_id:int, salary:float, hours:float):
+    budget = salary * hours
+    # round by 5 minute steps
+    seconds = (int(hours * 3600) // 300) * 300
     cnx = get_db()
     cur = cnx.cursor()
-    cur.execute(f"INSERT INTO kimai2_activities(name, visible, budget, budget_type) VALUES ('{acti_name}', 1, {budget}, 'month');")
+    cur.execute(f"INSERT INTO kimai2_activities(project_id, name, visible, time_budget, budget, budget_type) VALUES ({proj_id}, '{acti_name}', 1, {seconds}, {budget}, 'month');")
     cnx.commit()
     cur.execute(f"SELECT id FROM kimai2_activities WHERE name = '{acti_name}';")
     acti_id = next(cur)[0]
     cur.execute(f"INSERT INTO kimai2_activities_teams(activity_id, team_id) VALUES ({acti_id}, {team_id});")
     cnx.commit()
+
+
+def link_team_proj_customer(team_id, proj_id, custom_id):
+    cnx = get_db()
+    cur = cnx.cursor()
+    cur.execute(f"INSERT INTO kimai2_customers_teams(customer_id, team_id) VALUES ({custom_id}, {team_id});")
+    cur.execute(f"INSERT INTO kimai2_projects_teams(project_id, team_id) VALUES ({proj_id}, {team_id});")
+    cnx.commit()
+
 
 if __name__ == "__main__":
     pass

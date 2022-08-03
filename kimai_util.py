@@ -33,10 +33,12 @@ def console_user_create(user, passw, email):
     cons = get_console()
     res = subprocess.run([cons, "--no-interaction", "kimai:user:create", user, email, "ROLE_USER", passw])
     res.check_returncode()
-
+    
 
 def create_activity(usertype:str, user:str, salary:float, hours:float):
+    proj_id, custom_id = db_util.get_project_for_type(usertype)
     user_id = db_util.set_user_salary(user, salary)
-    team_name = f"{usertype}_{user}"
+    team_name = f"work_{user}"
     team_id = db_util.create_private_team(team_name, ADMIN_USER_ID, user_id)
-    db_util.create_private_activity(team_name, team_id, salary * hours)
+    db_util.create_private_activity(proj_id, team_name, team_id, salary, hours)
+    db_util.link_team_proj_customer(team_id, proj_id, custom_id)
