@@ -1,8 +1,11 @@
 import subprocess
 from dotenv import load_dotenv
 from os import getenv
+import db_util
 
 load_dotenv()
+
+ADMIN_USER_ID = 1
 
 
 def get_console():
@@ -28,5 +31,12 @@ def console_user_create(user, passw, email):
     password              Password for the new user (requested if not provided)
     """
     cons = get_console()
-    res = subprocess.run([cons, "--no-interaction", "kiami:user:create", user, email, "ROLE_USER", passw])
+    res = subprocess.run([cons, "--no-interaction", "kimai:user:create", user, email, "ROLE_USER", passw])
     res.check_returncode()
+
+
+def create_activity(usertype:str, user:str, salary:float, hours:float):
+    user_id = db_util.set_user_salary(user, salary)
+    team_name = f"{usertype}_{user}"
+    team_id = db_util.create_private_team(team_name, ADMIN_USER_ID, user_id)
+    db_util.create_private_activity(team_name, team_id, salary * hours)
