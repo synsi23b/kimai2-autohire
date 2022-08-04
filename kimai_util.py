@@ -1,9 +1,11 @@
 import subprocess
-from dotenv import load_dotenv
+import dotenv
 from os import getenv
 import db_util
+import re
+import urllib
 
-load_dotenv()
+dotenv.load_dotenv()
 
 ADMIN_USER_ID = 1
 
@@ -16,6 +18,19 @@ def get_console():
     if path is None:
         return "/var/www/kimai2/bin/console"
     return path
+
+
+def get_email_credentials():
+    """
+    return a tuple containing sender-address, password, server-address and port of the email string in the env file
+    """
+    url = dotenv.get_key("/var/www/kimai2/.env", "MAILER_URL")
+    mtc = re.match(r'smtp:\/\/(.+?):(.+?)\@(.+?):(\d+?)\?.+', url)
+    sender = urllib.parse.unquote(mtc.group(1))
+    passw = urllib.parse.unquote(mtc.group(2))
+    host = urllib.parse.unquote(mtc.group(3))
+    port = mtc.group(4)
+    return (sender, passw, host, int(port))
 
 
 def console_user_create(user, passw, email):
@@ -42,3 +57,8 @@ def create_activity(usertype:str, user:str, salary:float, hours:float):
     team_id = db_util.create_private_team(team_name, ADMIN_USER_ID, user_id)
     db_util.create_private_activity(proj_id, team_name, team_id, salary, hours)
     db_util.link_team_proj_customer(team_id, proj_id, custom_id)
+
+
+if __name__ == "__main__":
+    pass
+    tup = get_email_credentials()
