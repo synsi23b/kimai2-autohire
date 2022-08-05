@@ -8,17 +8,19 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 
-def send_mail(receiver, subject, plain, html, attachments=[]):
+def send_mail(receiver:list, subject:str, plain:str, attachments=[], html=""):
     sender, passw, server, port = get_email_credentials()
     # Create a multipart message and set headers
     message = MIMEMultipart()
     message["From"] = sender
-    message["To"] = receiver
+    message["To"] = ", ".join(receiver)
     message["Subject"] = subject
 
     # Add body to email
-    message.attach(MIMEText(plain, "plain"))
-    message.attach(MIMEText(html, "html"))
+    if plain:
+        message.attach(MIMEText(plain, "plain"))
+    if html:
+        message.attach(MIMEText(html, "html"))
 
     # Add attachments
     for fname in attachments:

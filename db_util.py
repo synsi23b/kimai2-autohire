@@ -3,6 +3,7 @@ import dotenv
 import mysql.connector
 from mysql.connector import errorcode, MySQLConnection
 from pathlib import Path
+from datetime import datetime
 
 
 envfile = Path(".env")
@@ -49,6 +50,16 @@ def set_user_alias(user:str, firstname:str, lastname:str):
     cur = cnx.cursor()
     cur.execute(f"UPDATE kimai2_users SET alias = '{name}' WHERE username = '{user}';")
     cnx.commit()
+
+
+def get_user_mail_alias(user_id):
+    cnx = get_db()
+    cur = cnx.cursor()
+    cur.execute(f"SELECT email, alias FROM kimai2_users WHERE id = {user_id};")
+    mail, alias = next(cur)
+    #cur.execute(f"SELECT value FROM kimai2_user_preferences WHERE user_id = {user_id} AND name = 'timezone';")
+    #return (mail, alias, next(cur)[0])
+    return (mail, alias)
 
 
 def set_user_salary(user:str, salary:float) -> int:
@@ -102,7 +113,21 @@ def link_team_proj_customer(team_id, proj_id, custom_id):
     cnx.commit()
 
 
+def sum_times_range(user_id:int, start, end) -> float:
+    cnx = get_db()
+    cur = cnx.cursor()
+    querry = f"SELECT SUM(duration) FROM kimai2_timesheet WHERE user = {user_id} AND date_tz between '{start}' AND '{end}';"
+    #print(querry)
+    cur.execute(querry)
+    res = next(cur)[0]
+    #print(res)
+    return int(res if res is not None else 0)
+
+
 if __name__ == "__main__":
     pass
     #cn = get_db()
     #create_private_team("bla", 1, "prparke")
+    e = datetime.now()
+    s = e.replace(month=e.month - 1)
+    sum_times_range(12, s, e)
