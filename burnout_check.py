@@ -65,14 +65,14 @@ def generate_report_user(args):
         else:
             overtime = ""
         tbl.append((f"{mon} - {sun}", f"{hours:.1f}", overtime))
-    return email, alias, alert, tbl
+    return email, alias, hourperweek, alert, tbl
 
 
 if __name__ == "__main__":
     users = get_scan_users()
     supervisor = get_alert_mails()
     print("Checking users: ", users)
-    for email, alias, alert, table in map(generate_report_user, users):
+    for email, alias, hpw, alert, table in map(generate_report_user, users):
         if alert:
             alert = " ALERT"
             receiver = supervisor.append(email)
@@ -81,7 +81,7 @@ if __name__ == "__main__":
             alert = ""
             receiver = [email]
             msg = f"Hi {alias}!\n\n"
-        msg += "Here is your worktime report for the last 5 weeks.\n\n"
+        msg += "Here is your worktime report for the last 5 weeks.\nYour nominal worktime is set to {hpw:.1f} hours\n\n"
         for dt, hr, ov in table:
             if ov:
                 msg += f"{dt}\n  {hr}h -> {ov} hours\n\n "

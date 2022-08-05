@@ -130,4 +130,4 @@ if __name__ == "__main__":
     #create_private_team("bla", 1, "prparke")
     e = datetime.now()
     s = e.replace(month=e.month - 1)
-    sum_times_range(12, s, e)
+    print(sum_times_range(12, s, e))
