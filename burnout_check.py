@@ -4,6 +4,7 @@ from db_util import sum_times_range, get_user_mail_alias
 from datetime import datetime, timezone, timedelta
 #from tabulate import tabulate
 from mail import send_mail
+from time import sleep
 
 
 def load_users():
@@ -88,5 +89,8 @@ if __name__ == "__main__":
                 msg += f"{dt}\n  {hr}h\n\n"
         msg += "I hope you have a great week!"
         send_mail(receiver, "Worktime Report" + alert, msg)
+        # take a break between sending to avoid ionos rate limit
+        # dont know exactly what the limit is :(
+        sleep(10)
         
 
