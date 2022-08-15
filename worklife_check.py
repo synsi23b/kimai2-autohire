@@ -8,7 +8,7 @@ from time import sleep
 
 
 def load_users():
-    pf = Path(__file__).parent.parent / "burnout.yaml"
+    pf = Path(__file__).parent.parent / "worklife.yaml"
     with open(str(pf), "r") as infi:
         # yaml file example:
         # alert@mail.address: whatever! can specify multiple receipents
