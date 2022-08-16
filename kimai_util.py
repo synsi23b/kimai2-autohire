@@ -50,9 +50,10 @@ def console_user_create(user, passw, email):
     res.check_returncode()
     
 
-def create_activity(usertype:str, user:str, salary:float, hours:float):
+def create_activity(usertype:str, user:str, hours:float):
     proj_id, custom_id = db_util.get_project_for_type(usertype)
-    user_id = db_util.set_user_salary(user, salary)
+    salary = db_util.get_project_rate(proj_id)
+    user_id = db_util.get_user_id(user)
     team_name = f"work_{user}"
     team_id = db_util.create_private_team(team_name, ADMIN_USER_ID, user_id)
     db_util.create_private_activity(proj_id, team_name, team_id, salary, hours)

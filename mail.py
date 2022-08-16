@@ -60,6 +60,13 @@ def send_mail(receiver:list, subject:str, plain:str, attachments=[], html=""):
             server.sendmail(sender, receiver, msg)
 
 
+def get_absolute_path(filename:str) -> Path:
+    thisf = Path(__file__)
+    filesfold = thisf.parent / "files"
+    filep = filesfold / filename
+    return filep.absolute()
+
+
 def encapsulate_html_with_body(contents):
     return f"""\
 <html>
@@ -82,6 +89,60 @@ def html_link(text, dest):
     return f"<a href=\"{dest}\">{text}</a>\n"
 
 
+def make_onboarding_msg(first:str, last:str, type:str, monthly_hours:float, user:str, password:str) -> str:
+    msg = f"""
+Hallo {first} {last},
+
+herzlich willkommen im Team von leap in time!
+
+Die Arbeitszeiterfassung funktioniert bei uns digital uber die Webseite:
+
+https://worktime.leap-in-time.de
+
+Um bezahlt zu werden, müssen Sie dort Ihre Arbeitszeiten korrekt angeben.
+Eine Anleitung wie das genau funktioniert und was dabei zu beachten ist finden Sie im Anhang,
+oder in der Dokumentation der Software: https://www.kimai.org/documentation/timesheet.html
+
+Ihre Login-Daten:
+  Username: {user}
+  Passwort: {password}
+
+Aus Sicherheitsgründen sollten sie das Passwort ändern, können es aber auch einfach so weiterverwenden.
+Wenn Sie das Passwort vergessen haben, können Sie sich einen Wiederherstellungslink per E-Mail auf der Startseite zusenden lassen.
+
+Ihre Einteilung ist in der Gruppe {type} mit {monthly_hours} Stunden pro Monat.
+
+Viel Spass!
+
+#####################################################
+
+Hello {first} {last},
+
+Welcome to the leap in time team!
+
+We use this website to record working hours digitally:
+
+https://worktime.leap-in-time.de
+
+In order to get paid you have to correctly submit your working hours there.
+You will find instructions on how this works and what you need to bear in mind in the attachment,
+or in the documentation of the software: https://www.kimai.org/documentation/timesheet.html
+
+Your login data:
+  Username: {user}
+  Password: {password}
+
+For security reasons you should change the password, but you can also continue to use it as it is.
+If you forget the password, you can have a recovery link sent to you by email on the home page.
+
+Your allocation is in the group {type} with {monthly_hours} hours per month.
+
+Have fun!
+
+"""
+    return msg
+
+
 if __name__ == "__main__":
     subj = "Test Email"
     receiver = "mail@himitsu.dev"
@@ -91,3 +152,4 @@ if __name__ == "__main__":
       + html_link("Go To KIMAI", "kimai.org")
     html = encapsulate_html_with_body(html)
     send_mail(receiver, subj, plain, html, ["./requirements.txt", "README.md"])
+

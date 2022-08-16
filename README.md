@@ -6,13 +6,15 @@ programmed against kimai version 1.21
 
 ## create second database for keeping own records on kimai host
 
-*not yet used*
-
 ```sql
 mysql> create database dbautohire;
 mysql> grant all privileges on dbautohire.* to kimai@localhost with grant option;
 mysql> flush privileges;
 ```
+create tables in this database:
+
+db_util ->
+  - _create_season
 ## basic setup
 1. after cloning into home directory, install requirements in a virtual environment called venv
 ```bash
@@ -50,3 +52,17 @@ one entry per line, key-value pairs.
 mysql> USE kimaidb;
 mysql> SELECT id, username, alias FROM kimai2_users;
 ```
+
+# user creation script
+
+creating a user can done via command line arguments and the script `create_user.py`
+
+The arguments to supply are the new Users First and Lastname, e-mail address, groupname and working hours per month.
+
+The users groupname needs to match a Project name in the Kimai instance. From this grouping, the users salary is also retrieved. The salary needs to be set on the project level in Kimai. The group/project will also be used to check for seasonal changes in allowable worktime per month regardless of monthly hours set.
+
+The monthly hours will be used to create a budgeted activity for this user only, but going over budget is acceptable (set in kimai settings)
+
+Another way to create multiple users at once is to supply a csv file after the flag --file. There is an example file in the files folder.
+
+User creation will trigger an e-mail using the kimai credentials. The email contains the user manuals and the login credentials.

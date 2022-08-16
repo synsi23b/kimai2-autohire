@@ -11,6 +11,15 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true
+        },
+        {
+            "name": "Python: create form csv",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/create_user.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--file", "files/createusers.csv"]
         }
     ]
 }

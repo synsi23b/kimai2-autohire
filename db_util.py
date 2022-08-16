@@ -13,14 +13,10 @@ else:
     env = dotenv.dotenv_values("/var/www/kimai2/.env")
 
 
-CNX = None
+CNX = {}
 
 
-def get_db() -> MySQLConnection:
-    global CNX
-    if CNX:
-        if CNX.is_connected():
-            return CNX
+def get_db(override_dbname="") -> MySQLConnection:
     dbstring = env["DATABASE_URL"]
     mtc = re.match(r'mysql:\/\/(.+?):(.+?)@(.+?):(\d+)\/(.+?)\?.+', dbstring)
     config = {
@@ -30,6 +26,16 @@ def get_db() -> MySQLConnection:
         "port": mtc.group(4),
         "database": mtc.group(5),
     }
+    if override_dbname != "":
+        config["database"] = override_dbname
+        dbname = override_dbname
+    else:
+        dbname = config["database"]
+
+    if CNX.get(dbname, None):
+        if CNX[dbname].is_connected():
+            return CNX[dbname]
+
     try:
         cnx = mysql.connector.connect(**config)
     except mysql.connector.Error as err:
@@ -40,7 +46,7 @@ def get_db() -> MySQLConnection:
         else:
             print(err)
     else:
-        CNX = cnx
+        CNX[dbname] = cnx
         return cnx
 
 
@@ -50,6 +56,21 @@ def set_user_alias(user:str, firstname:str, lastname:str):
     cur = cnx.cursor()
     cur.execute(f"UPDATE kimai2_users SET alias = '{name}' WHERE username = '{user}';")
     cnx.commit()
+
+
+def get_user_id(user:str) -> int:
+    cnx = get_db()
+    cur = cnx.cursor()
+    cur.execute(f"SELECT id FROM kimai2_users WHERE username = '{user}';")
+    return next(cur)[0]
+
+
+def check_username_free(user:str):
+    try:
+        uid = get_user_id(user)
+        return False
+    except StopIteration:
+        return True
 
 
 def get_user_mail_alias(user_id):
@@ -63,10 +84,9 @@ def get_user_mail_alias(user_id):
 
 
 def set_user_salary(user:str, salary:float) -> int:
+    user_id = get_user_id(user)
     cnx = get_db()
     cur = cnx.cursor()
-    cur.execute(f"SELECT id FROM kimai2_users WHERE username = '{user}';")
-    user_id = next(cur)[0]
     cur.execute(f"INSERT INTO kimai2_user_preferences(user_id, name, value) VALUES({user_id}, 'hourly_rate', '{salary:.2f}');")
     cnx.commit()
     return user_id
@@ -77,6 +97,13 @@ def get_project_for_type(usertype:str):
     cur = cnx.cursor()
     cur.execute(f"SELECT id, customer_id FROM kimai2_projects WHERE name = '{usertype}';")
     return next(cur)
+
+
+def get_project_rate(projid:int) -> float:
+    cnx = get_db()
+    cur = cnx.cursor()
+    cur.execute(f"SELECT rate FROM kimai2_projects_rates WHERE project_id = {projid};")
+    return next(cur)[0]
 
 
 def create_private_team(team_name:str, leader_id:int, user_id:int) -> int:
@@ -116,18 +143,51 @@ def link_team_proj_customer(team_id, proj_id, custom_id):
 def sum_times_range(user_id:int, start, end) -> float:
     cnx = get_db()
     cur = cnx.cursor()
-    querry = f"SELECT SUM(duration) FROM kimai2_timesheet WHERE user = {user_id} AND date_tz between '{start}' AND '{end}';"
-    #print(querry)
-    cur.execute(querry)
+    cur.execute(f"SELECT SUM(duration) FROM kimai2_timesheet WHERE user = {user_id} AND date_tz between '{start}' AND '{end}';")
     res = next(cur)[0]
-    #print(res)
     return int(res if res is not None else 0)
+
+
+def _create_table_autoid(name:str, fields:list):
+    cnx = get_db("dbautohire")
+    cur = cnx.cursor()
+    expand_fields = ',\n'.join([" "+f for f in fields])
+    querry = f"CREATE TABLE {name} (\n id INT NOT NULL,\n{expand_fields},\n PRIMARY KEY (id)\n);"
+    res = input(f"\n\n{querry}\n\n Execute querry? [y/n]")
+    if res == "y":
+        print("commiting")
+        cur.execute(querry)
+        cnx.commit()
+    else:
+        print("Abroted")
+
+
+def _create_season():
+    fields = [
+        "name VARCHAR(255)",
+        "proj_id INT",
+        "max_hours DOUBLE",
+        "start DATE",
+        "end DATE"
+    ]
+    _create_table_autoid("seasons", fields)
+
+
+#def _create_user_season():
+# dont need this table, just alwayrs reference timeshit->proj_id->season
+#    fields = [
+#        "user_id INT",
+#        "season_id INT"
+#    ]
+#    _create_table_autoid("users_seasons", fields)
 
 
 if __name__ == "__main__":
     pass
     #cn = get_db()
     #create_private_team("bla", 1, "prparke")
-    e = datetime.now()
-    s = e.replace(month=e.month - 1)
-    print(sum_times_range(12, s, e))
+    #e = datetime.now()
+    #s = e.replace(month=e.month - 1)
+    #print(sum_times_range(12, s, e))
+    #_create_season()
+    #_create_user_season()
