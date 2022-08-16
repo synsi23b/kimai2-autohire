@@ -95,7 +95,7 @@ Hallo {first} {last},
 
 herzlich willkommen im Team von leap in time!
 
-Die Arbeitszeiterfassung funktioniert bei uns digital uber die Webseite:
+Die Arbeitszeiterfassung funktioniert bei uns digital über die Webseite:
 
 https://worktime.leap-in-time.de
 
