@@ -144,7 +144,7 @@ class AutogenProjekt:
                 wmax = self._max_season
             if duration > wmax:
                 weeks_ok = False
-                weeks.append((False, resp + f" !!! The maximum during this week is {wmax} !!!" ))
+                weeks.append((False, resp + f" !!! The maximum during this week is {wmax:.1f} !!!" ))
             else:
                 weeks.append((True, resp))
         return weeks_ok, weeks
@@ -159,9 +159,11 @@ if __name__ == "__main__":
     #tup = get_email_credentials()
     proj = get_gen_projects()[0]
     wrk = proj.get_workers(2022, 8)[0]
-    week = proj.is_worker_weeks_ok(wrk)
-    month = proj.is_worker_month_ok(wrk)
+    for s in wrk._sheets:
+        print(s)
+    #week = proj.is_worker_weeks_ok(wrk)
+    #month = proj.is_worker_month_ok(wrk)
 
-    print(week)
+    #print(week)
 
     pass

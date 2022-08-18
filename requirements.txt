@@ -1,5 +1,7 @@
 mysql-connector-python
 python-dotenv
 pyyaml
-#pytz
+pytz
 #tabulate
+babel
+openpyxl
