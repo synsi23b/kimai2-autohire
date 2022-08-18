@@ -3,7 +3,8 @@ import dotenv
 import mysql.connector
 from mysql.connector import errorcode, MySQLConnection
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, date, timedelta
+import calendar
 
 
 envfile = Path(".env")
@@ -83,6 +84,14 @@ def get_user_mail_alias(user_id):
     return (mail, alias)
 
 
+def get_worker_budget(user_id:int) -> float:
+    cnx = get_db()
+    cur = cnx.cursor()
+    cur.execute(f"SELECT username FROM kimai2_users WHERE id = {user_id};")
+    uname = next(cur)[0]
+    cur.execute(f"SELECT time_budget FROM kimai2_activities WHERE name = 'work_{uname}';")
+    return next(cur)[0]
+
 def set_user_salary(user:str, salary:float) -> int:
     user_id = get_user_id(user)
     cnx = get_db()
@@ -140,12 +149,40 @@ def link_team_proj_customer(team_id, proj_id, custom_id):
     cnx.commit()
 
 
+def sum_times_weeks(user_id:int, dates:list) -> float:
+    weeks = {}
+    for d in dates:
+        monday = d - timedelta(days=d.weekday())
+        if monday not in weeks:
+            sunday = monday + timedelta(days=6)
+            val = sum_times_range(user_id, monday, sunday)
+            weeks[monday] = (monday, sunday, val)
+    return list(weeks.values())
+
+
 def sum_times_range(user_id:int, start, end) -> float:
     cnx = get_db()
     cur = cnx.cursor()
     cur.execute(f"SELECT SUM(duration) FROM kimai2_timesheet WHERE user = {user_id} AND date_tz between '{start}' AND '{end}';")
     res = next(cur)[0]
     return int(res if res is not None else 0)
+
+
+def get_generate_projects() -> list:
+    cnx = get_db()
+    cur = cnx.cursor()
+    cur.execute(f"SELECT id, name, comment FROM kimai2_projects WHERE comment LIKE '%*generate_sheets*%';")
+    return list(cur)
+
+
+def get_sheets_for_project(proj_id, year:int, month:int) -> list:
+    start = date(year, month, 1)
+    # monthrange returns a tuple (day_of_week, last_day_of_month)
+    end = date(year, month, calendar.monthrange(year, month)[1])
+    cnx = get_db()
+    cur = cnx.cursor()
+    cur.execute(f"SELECT * FROM kimai2_timesheet WHERE project_id = {proj_id} AND date_tz between '{start}' AND '{end}' ORDER BY start_time ASC;")
+    return list(cur)
 
 
 def _create_table_autoid(name:str, fields:list):
@@ -191,3 +228,5 @@ if __name__ == "__main__":
     #print(sum_times_range(12, s, e))
     #_create_season()
     #_create_user_season()
+    #print(get_generate_projects())
+    # [(20, 'Werkstudent_TUD', '*generate_sheets*\r\nmax_weekly_during: 20\r\nmax_weekly_outside: 40\r\nseasons:\r\n - 14.10.2024:14.02.2025\r\n - 15.04.2024:19.07.2024\r\n - 16.10.2023:09.02.2024\r\n - 11.04.2023:14.07.2023\r\n - 17.10.2022:10.02.2023')]

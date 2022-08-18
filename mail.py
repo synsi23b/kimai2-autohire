@@ -107,7 +107,7 @@ Ihre Login-Daten:
   Username: {user}
   Passwort: {password}
 
-Aus Sicherheitsgründen sollten sie das Passwort ändern, können es aber auch einfach so weiterverwenden.
+Aus Sicherheitsgründen sollten Sie das Passwort ändern, können es aber auch einfach so weiterverwenden.
 Wenn Sie das Passwort vergessen haben, können Sie sich einen Wiederherstellungslink per E-Mail auf der Startseite zusenden lassen.
 
 Ihre Einteilung ist in der Gruppe {type} mit {monthly_hours} Stunden pro Monat.
