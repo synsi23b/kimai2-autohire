@@ -77,6 +77,10 @@ class Worker:
         self._sum_month = db_util.sum_times_range(id, sheets[0][-1], sheets[-1][-1]) / 3600
         self._budget_month = db_util.get_worker_budget(id)
 
+    def mark_sheets_exported(self):
+        db_util.set_sheets_exported([s[0] for s in self._sheets])
+
+
 class AutogenProjekt:
     def __init__(self, id:int, name:str, comment:str):
         self._id = id
@@ -84,7 +88,7 @@ class AutogenProjekt:
         self._comment = comment
         comment = comment.replace("*generate_sheets*\r\n", "")
         data = yaml.load(comment, yaml.Loader)
-        self._max_weekly = float(data["max_weekly"])
+        self._max_weekly = float(data.get("max_weekly", 24.0 * 7))
         self._max_monthly = float(data.get("max_monthly", 0.0))
         self._max_season = float(data.get("max_weekly_season", 0.0))
         self._seasons = []
@@ -124,13 +128,13 @@ class AutogenProjekt:
         if self._max_monthly != 0.0:
             if worker._sum_month > self._max_monthly:
                 ovr = worker._sum_month - self._max_monthly
-                return False, resp + f"You are {ovr:.1f} hours over the allowed monthly hours.\nPlease try to fix this issue before the salary reporting date by moving time records into the next month"
+                return False, resp + f"You are {ovr:.2f} hours over the allowed monthly hours.\nPlease try to fix this issue before the salary reporting date by moving time records into the next month"
         return True, resp
 
     def is_worker_budget_ok(self, worker:Worker):
         ovr = worker._sum_month - worker._budget_month
         if ovr > 0:
-            return False, f"Your contract is for {worker._budget_month:.1f} hours. You worked {ovr:.1f} to much."
+            return False, f"Your contract is for {worker._budget_month:.2f} hours. You worked {ovr:.2f} to much."
         return True, ""
 
     def is_worker_weeks_ok(self, worker:Worker):
@@ -138,13 +142,13 @@ class AutogenProjekt:
         weeks_ok = True
         for week in worker._weeks:
             duration = week[2] / 3600
-            resp = f"{week[0]} - {week[1]}    {duration:.1f} hours."
+            resp = f"{week[0]} - {week[1]}    {duration:.2f} hours."
             wmax = self._max_weekly
             if self.is_in_season(week[0]):
                 wmax = self._max_season
             if duration > wmax:
                 weeks_ok = False
-                weeks.append((False, resp + f" !!! The maximum during this week is {wmax:.1f} !!!" ))
+                weeks.append((False, resp + f" !!! The maximum during this week is {wmax:.2f} !!!" ))
             else:
                 weeks.append((True, resp))
         return weeks_ok, weeks

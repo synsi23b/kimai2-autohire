@@ -7,6 +7,8 @@ import argparse
 import pathlib
 from csv import DictReader
 import traceback
+import logging
+from pathlib import Path
 
 
 def create_user(firstname:str, lastname:str, email:str, usertype:str, monthly_hours:float) -> None:
@@ -18,6 +20,7 @@ def create_user(firstname:str, lastname:str, email:str, usertype:str, monthly_ho
     pwd = "".join(random.choices(string.ascii_letters + string.digits,k=12))
     kimai_util.console_user_create(usr, pwd, email)
     print(usr, pwd)
+    logging.info(f"{usr} {pwd}")
     db_util.set_user_alias(usr, firstname, lastname)
     kimai_util.create_activity(usertype, usr, monthly_hours)
     msg = mail.make_onboarding_msg(firstname, lastname, usertype, monthly_hours, usr, pwd)
@@ -41,8 +44,13 @@ def create_from_dic(user, interactive):
             if ans == "n":
                 break
     else:
-        print(user)
-        create_user(**user)
+        logging.info("create user non interactive")
+        logging(str(user))
+        try:
+            create_user(**user)
+        except Exception as e:
+            logging.exception(e)
+            exit(-1)
 
 
 def create_by_csv(filepath):
@@ -52,6 +60,9 @@ def create_by_csv(filepath):
                 
 
 if __name__ == "__main__":
+    thisfile = Path(__file__)
+    logging.basicConfig(filename=str(thisfile.parent.parent.resolve() / f"kimai2_autohire_{thisfile.stem}.log"), level=logging.INFO)
+
     parser = argparse.ArgumentParser(description="onboard users either from csv or from command line")
     parser.add_argument("--file", dest="csvfile", default=None, help="Specify the file to create users from. If specified ignores other arguments.")
     parser.add_argument("userdata", nargs="*", help="create user from command line: Firstname, Lastname, emailaddr, Usertype, monthly_hours")

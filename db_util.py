@@ -92,6 +92,7 @@ def get_worker_budget(user_id:int) -> float:
     cur.execute(f"SELECT time_budget FROM kimai2_activities WHERE name = 'work_{uname}';")
     return next(cur)[0]
 
+
 def set_user_salary(user:str, salary:float) -> int:
     user_id = get_user_id(user)
     cnx = get_db()
@@ -149,7 +150,7 @@ def link_team_proj_customer(team_id, proj_id, custom_id):
     cnx.commit()
 
 
-def sum_times_weeks(user_id:int, dates:list) -> float:
+def sum_times_weeks(user_id:int, dates:list) -> list:
     weeks = {}
     for d in dates:
         monday = d - timedelta(days=d.weekday())
@@ -184,6 +185,14 @@ def get_sheets_for_project(proj_id, year:int, month:int) -> list:
     cur.execute(f"SELECT * FROM kimai2_timesheet WHERE project_id = {proj_id} AND date_tz between '{start}' AND '{end}' ORDER BY start_time ASC;")
     return list(cur)
 
+
+def set_sheets_exported(sheet_ids:list):
+    cnx = get_db()
+    cur = cnx.cursor()
+    for i in sheet_ids:
+        cur.execute(f"UPDATE kimai2_timesheet SET exported= 1 WHERE id={i};")
+    cnx.commit()
+    
 
 def _create_table_autoid(name:str, fields:list):
     cnx = get_db("dbautohire")

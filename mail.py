@@ -7,13 +7,26 @@ from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+import logging
+
 
 def send_mail(receiver:list, subject:str, plain:str, attachments=[], html=""):
+    try:
+        _send_mail(receiver, subject, plain, attachments, html)
+    except Exception as e:
+        logging.exception(e)
+
+def _send_mail(receiver:list, subject:str, plain:str, attachments=[], html=""):
+    logging.info(f"Sending mail to {receiver}")
     sender, passw, server, port = get_email_credentials()
+
     # Create a multipart message and set headers
     message = MIMEMultipart()
     message["From"] = sender
-    message["To"] = ", ".join(receiver)
+    if type(receiver) is str:
+        message["To"] = receiver
+    else:
+        message["To"] = ", ".join(receiver)
     message["Subject"] = subject
 
     # Add body to email
@@ -26,20 +39,23 @@ def send_mail(receiver:list, subject:str, plain:str, attachments=[], html=""):
     for fname in attachments:
         fname = Path(fname)
         if not fname.is_file():
-            print("Error: Attempt to attach none existing file: ", fname)
+            logging.error(f"Error: Attempt to attach none existing file: {fname}")
             continue
         part = None
         with open(str(fname), "rb") as infile:
             # Add file as application/octet-stream
             # Email client can usually download this automatically as attachment
             part = MIMEBase("application", "octet-stream")
+            if fname.suffix == ".xlsx":
+                part = MIMEBase("application", 'vnd.ms-excel') 
             part.set_payload(infile.read())
             # Encode file in ASCII characters to send by email    
         encoders.encode_base64(part)
         # Add header as key/value pair to attachment part
         part.add_header(
             "Content-Disposition",
-            f"attachment; filename= {fname.name}",
+            "attachment",
+            filename=fname.name,
         )
         # Add attachment to message
         message.attach(part)
