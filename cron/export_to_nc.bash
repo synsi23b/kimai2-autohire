@@ -2,9 +2,9 @@
 
 lxc exec kimai -- /root/export.bash
 
-YEARLONG=`date +%Y`
-YEAR=`date +%Y | cut -c 3,4`
-MONTH=`date +%m`
+YEARLONG=`date +%Y -d 'last month'`
+YEAR=`echo $YEARLONG | cut -c 3,4`
+MONTH=`date +%m -d 'last month'`
 
 SRC="/var/lib/lxd/containers/kimai/rootfs/home/ubuntu/export/*${MONTH}_${YEAR}*.xlsx"
 DST="/media/softwareraid/nextcloud/__groupfolders/2/STUNDENZETTEL/$YEARLONG/$MONTH"
