@@ -61,7 +61,8 @@ def create_by_csv(filepath):
 
 if __name__ == "__main__":
     thisfile = Path(__file__)
-    logging.basicConfig(filename=str(thisfile.parent.parent.resolve() / f"kimai2_autohire_{thisfile.stem}.log"), level=logging.INFO)
+    logging.basicConfig(filename=str(thisfile.parent.parent.resolve() / f"kimai2_autohire_{thisfile.stem}.log"),
+    format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
 
     parser = argparse.ArgumentParser(description="onboard users either from csv or from command line")
     parser.add_argument("--file", dest="csvfile", default=None, help="Specify the file to create users from. If specified ignores other arguments.")

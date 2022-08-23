@@ -15,7 +15,7 @@ def utc_unaware_to_tz(dt:datetime, tz) -> datetime:
     return dt.astimezone(pytz.timezone(tz))
 
 
-def fill_hours_files(alias:str, sheets:list, outfolder:Path):
+def fill_hours_files(alias:str, sheets:list, outfolder:Path, fileprefix:str = ""):
     company_data = {}
     this_location = Path(__file__).parent.resolve()
     print(this_location.parent)
@@ -69,7 +69,7 @@ def fill_hours_files(alias:str, sheets:list, outfolder:Path):
             wsheet[f"D{row}"] = "00:00:00"
             wsheet[f"E{row}"] = end.strftime("%H:%M:00")
 
-    fname = fname.replace("MM_JJ", start.strftime("%m_%y")).replace("Mitarbeiter", alias.replace(" ", "_"))
+    fname = fileprefix + fname.replace("MM_JJ", start.strftime("%m_%y")).replace("Mitarbeiter", alias.replace(" ", "_"))
     outf = outfolder / fname
     workbook.save(filename=str(outf))
     return outf
@@ -92,6 +92,11 @@ The final report will be generated on the 3rd of the following month.
         bmsg += """
 This report was exported and can't be changed anymore. It will be used to calculate your salary.
 """
+
+    if preliminary:
+        prefix = "Preliminary-"
+    else:
+        prefix = ""
     projects = get_gen_projects()
     owrk = []
     for proj in projects:
@@ -106,14 +111,15 @@ This report was exported and can't be changed anymore. It will be used to calcul
                 msg += "\n\n!! You worked to many hours in one of the weeks !!\n"
             for week in weeks:
                 msg += f"\n{week[1]}\n"
-            repofile = fill_hours_files(wrk._alias, wrk._sheets, reportfolder)
+            repofile = fill_hours_files(wrk._alias, wrk._sheets, reportfolder, prefix)
             owrk.append((wrk, msg, repofile))
     return owrk
 
 
 if __name__ == "__main__":
     thisfile = Path(__file__).resolve()
-    logging.basicConfig(filename=str(thisfile.parent.parent / f"kimai2_autohire_{thisfile.stem}.log"), level=logging.INFO)
+    logging.basicConfig(filename=str(thisfile.parent.parent / f"kimai2_autohire_{thisfile.stem}.log"), 
+    format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
 
     parser = argparse.ArgumentParser(description="export timesheets for users of projects with *generate_sheets* in project description")
     parser.add_argument("--today", action="store_true", help="use today as a time base to generate monthly report rather than last month")
