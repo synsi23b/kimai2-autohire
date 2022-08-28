@@ -9,7 +9,7 @@ from datetime import datetime, date, timedelta
 import calendar
 
 
-envfile = Path(".env")
+envfile = Path(__file__).resolve().parent / ".env"
 if envfile.is_file():
     env = dotenv.dotenv_values(envfile)
 else:
