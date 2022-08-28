@@ -56,14 +56,14 @@ def get_db(override_dbname="") -> MySQLConnection:
 def set_user_alias(user:str, firstname:str, lastname:str):
     name = f"{firstname} {lastname}"
     cnx = get_db()
-    cur = cnx.cursor()
+    cur = cnx.cursor(buffered=True)
     cur.execute(f"UPDATE kimai2_users SET alias = '{name}' WHERE username = '{user}';")
     cnx.commit()
 
 
 def get_user_id(user:str) -> int:
     cnx = get_db()
-    cur = cnx.cursor()
+    cur = cnx.cursor(buffered=True)
     cur.execute(f"SELECT id FROM kimai2_users WHERE username = '{user}';")
     return next(cur)[0]
 
@@ -78,7 +78,7 @@ def check_username_free(user:str):
 
 def get_user_mail_alias(user_id):
     cnx = get_db()
-    cur = cnx.cursor()
+    cur = cnx.cursor(buffered=True)
     cur.execute(f"SELECT email, alias FROM kimai2_users WHERE id = {user_id};")
     mail, alias = next(cur)
     #cur.execute(f"SELECT value FROM kimai2_user_preferences WHERE user_id = {user_id} AND name = 'timezone';")
@@ -88,7 +88,7 @@ def get_user_mail_alias(user_id):
 
 def get_worker_budget(user_id:int) -> float:
     cnx = get_db()
-    cur = cnx.cursor()
+    cur = cnx.cursor(buffered=True)
     cur.execute(f"SELECT username FROM kimai2_users WHERE id = {user_id};")
     uname = next(cur)[0]
     cur.execute(f"SELECT time_budget FROM kimai2_activities WHERE name = 'work_{uname}';")
@@ -98,7 +98,7 @@ def get_worker_budget(user_id:int) -> float:
 def set_user_salary(user:str, salary:float) -> int:
     user_id = get_user_id(user)
     cnx = get_db()
-    cur = cnx.cursor()
+    cur = cnx.cursor(buffered=True)
     cur.execute(f"INSERT INTO kimai2_user_preferences(user_id, name, value) VALUES({user_id}, 'hourly_rate', '{salary:.2f}');")
     cnx.commit()
     return user_id
@@ -106,21 +106,21 @@ def set_user_salary(user:str, salary:float) -> int:
 
 def get_project_for_type(usertype:str):
     cnx = get_db()
-    cur = cnx.cursor()
+    cur = cnx.cursor(buffered=True)
     cur.execute(f"SELECT id, customer_id FROM kimai2_projects WHERE name = '{usertype}';")
     return next(cur)
 
 
 def get_project_rate(projid:int) -> float:
     cnx = get_db()
-    cur = cnx.cursor()
+    cur = cnx.cursor(buffered=True)
     cur.execute(f"SELECT rate FROM kimai2_projects_rates WHERE project_id = {projid};")
     return next(cur)[0]
 
 
 def create_private_team(team_name:str, leader_id:int, user_id:int) -> int:
     cnx = get_db()
-    cur = cnx.cursor()
+    cur = cnx.cursor(buffered=True)
     cur.execute(f"INSERT INTO kimai2_teams(name, color) VALUES('{team_name}', '#73b761');")
     cnx.commit()
     cur.execute(f"SELECT id FROM kimai2_teams WHERE name = '{team_name}';")
@@ -135,7 +135,7 @@ def create_private_activity(proj_id:int, acti_name:str, team_id:int, salary:floa
     # round by 5 minute steps
     seconds = (int(hours * 3600) // 300) * 300
     cnx = get_db()
-    cur = cnx.cursor()
+    cur = cnx.cursor(buffered=True)
     cur.execute(f"INSERT INTO kimai2_activities(project_id, name, visible, time_budget, budget, budget_type) VALUES ({proj_id}, '{acti_name}', 1, {seconds}, {budget}, 'month');")
     cnx.commit()
     cur.execute(f"SELECT id FROM kimai2_activities WHERE name = '{acti_name}';")
@@ -146,7 +146,7 @@ def create_private_activity(proj_id:int, acti_name:str, team_id:int, salary:floa
 
 def link_team_proj_customer(team_id, proj_id, custom_id):
     cnx = get_db()
-    cur = cnx.cursor()
+    cur = cnx.cursor(buffered=True)
     cur.execute(f"INSERT INTO kimai2_customers_teams(customer_id, team_id) VALUES ({custom_id}, {team_id});")
     cur.execute(f"INSERT INTO kimai2_projects_teams(project_id, team_id) VALUES ({proj_id}, {team_id});")
     cnx.commit()
@@ -165,7 +165,7 @@ def sum_times_weeks(user_id:int, dates:list) -> list:
 
 def sum_times_range(user_id:int, start, end) -> float:
     cnx = get_db()
-    cur = cnx.cursor()
+    cur = cnx.cursor(buffered=True)
     cur.execute(f"SELECT SUM(duration) FROM kimai2_timesheet WHERE user = {user_id} AND date_tz between '{start}' AND '{end}';")
     res = next(cur)[0]
     return int(res if res is not None else 0)
@@ -173,7 +173,7 @@ def sum_times_range(user_id:int, start, end) -> float:
 
 def get_generate_projects() -> list:
     cnx = get_db()
-    cur = cnx.cursor()
+    cur = cnx.cursor(buffered=True)
     cur.execute(f"SELECT id, name, comment FROM kimai2_projects WHERE comment LIKE '%*generate_sheets*%';")
     return list(cur)
 
@@ -183,14 +183,14 @@ def get_sheets_for_project(proj_id, year:int, month:int) -> list:
     # monthrange returns a tuple (day_of_week, last_day_of_month)
     end = date(year, month, calendar.monthrange(year, month)[1])
     cnx = get_db()
-    cur = cnx.cursor()
+    cur = cnx.cursor(buffered=True)
     cur.execute(f"SELECT * FROM kimai2_timesheet WHERE project_id = {proj_id} AND date_tz between '{start}' AND '{end}' ORDER BY start_time ASC;")
     return list(cur)
 
 
 def set_sheets_exported(sheet_ids:list):
     cnx = get_db()
-    cur = cnx.cursor()
+    cur = cnx.cursor(buffered=True)
     for i in sheet_ids:
         cur.execute(f"UPDATE kimai2_timesheet SET exported= 1 WHERE id={i};")
     cnx.commit()
@@ -201,14 +201,14 @@ def get_last_edited_sheet(user_id:int, sheet_date:date) -> tuple:
     # monthrange returns a tuple (day_of_week, last_day_of_month)
     end = sheet_date.replace(day= calendar.monthrange(sheet_date.year, sheet_date.month)[1])
     cnx = get_db()
-    cur = cnx.cursor()
+    cur = cnx.cursor(buffered=True)
     cur.execute(f"SELECT id, modified_at FROM kimai2_timesheet WHERE user = {user_id} AND date_tz between '{start}' AND '{end}' ORDER BY modified_at DESC;")
     return next(cur)
 
 
 def get_generation_cycle_id_dt(user_id:int):
     cnx = get_db("dbautohire")
-    cur = cnx.cursor()
+    cur = cnx.cursor(buffered=True)
     cur.execute(f"SELECT timesheet, modified_at FROM last_generated_change WHERE id = {user_id};")
     try:
         tup = next(cur)
@@ -219,7 +219,7 @@ def get_generation_cycle_id_dt(user_id:int):
 
 def set_last_generated_sheet(user_id, sheet_id, mod_at):
     cnx = get_db("dbautohire")
-    cur = cnx.cursor()
+    cur = cnx.cursor(buffered=True)
     q= f"INSERT INTO last_generated_change (id, timesheet, modified_at) VALUES({user_id}, {sheet_id}, '{mod_at}') ON DUPLICATE KEY UPDATE timesheet={sheet_id}, modified_at='{mod_at}'"
     cur.execute(q)
     cnx.commit()
@@ -227,7 +227,7 @@ def set_last_generated_sheet(user_id, sheet_id, mod_at):
 
 def _create_table_autoid(name:str, fields:list):
     cnx = get_db("dbautohire")
-    cur = cnx.cursor()
+    cur = cnx.cursor(buffered=True)
     expand_fields = ',\n'.join([" "+f for f in fields])
     querry = f"CREATE TABLE {name} (\n id INT NOT NULL,\n{expand_fields},\n PRIMARY KEY (id)\n);"
     res = input(f"\n\n{querry}\n\n Execute querry? [y/n]")
