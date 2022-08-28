@@ -18,7 +18,7 @@ def utc_unaware_to_tz(dt:datetime, tz) -> datetime:
 def fill_hours_files(alias:str, sheets:list, outfolder:Path, fileprefix:str = ""):
     company_data = {}
     this_location = Path(__file__).parent.resolve()
-    print(this_location.parent)
+    #print(this_location.parent)
     with open(str(this_location.parent / "kgl_info.yaml")) as inf:
         company_data = yaml.load(inf, yaml.Loader)
     fname = "Stundenzettel MM_JJ - Mitarbeiter_Lohn.xlsx"
@@ -53,19 +53,32 @@ def fill_hours_files(alias:str, sheets:list, outfolder:Path, fileprefix:str = ""
         start = utc_unaware_to_tz(sl[0][4], timezone)
         #end = utc_unaware_to_tz(s[5], timezone)
         # get the sum of the duration of all timesheets of that day
-        end = start + datetime.timedelta(seconds=sum([s[6] for s in sl]))
+        duration = datetime.timedelta(seconds=sum([s[6] for s in sl]))
+        end = start + duration
+        # create description for all entries
+        work_contents = [s[7] for s in sl if s[7] != None]
+        if work_contents == []:
+            work_contents = "Arbeit"
+        else:
+            work_contents = "; ".join(work_contents)
+
         if start.date() == end.date():
             row = 13 + start.day
-            wsheet[f"C{row}"] = "Arbeit"
+            if wsheet[f"C{row}"] == "start gestern; ":
+                # cells already written by 24h roll over -> adjust start and end time for today
+                start = datetime.datetime.strptime(wsheet[f"E{row}"], "%H:%M:%S")
+                end = start + duration
+            wsheet[f"C{row}"] = "start gestern; " + work_contents
             wsheet[f"D{row}"] = start.strftime("%H:%M:00")
             wsheet[f"E{row}"] = end.strftime("%H:%M:00")
         else:
             # midnight roll over
             row = 13 + start.day
-            wsheet[f"C{row}"] = "Arbeit"
+            wsheet[f"C{row}"] = work_contents
             wsheet[f"D{row}"] = start.strftime("%H:%M:00")
             wsheet[f"E{row}"] = "24:00:00"
             row += 1
+            wsheet[f"C{row}"] = "start gestern; "
             wsheet[f"D{row}"] = "00:00:00"
             wsheet[f"E{row}"] = end.strftime("%H:%M:00")
 
@@ -104,7 +117,10 @@ This report was exported and can't be changed anymore. It will be used to calcul
         workers = proj.get_workers(year, month)
         for wrk in workers:
             if not wrk.was_changed_since_last_gen() and preliminary:
-                logging.info(f"Skipping generation for {wrk._alias} not changed")
+                logging.info(f"Skipping generation for {wrk._alias}: not changed")
+                continue
+            if not wrk.last_change_older_than_minutes(15):
+                logging.info(f"Skipping generation for {wrk._alias}: last changed recently")
                 continue
             logging.info(f"Generating worker {wrk._alias}")
             month_ok, month_msg = proj.is_worker_month_ok(wrk)

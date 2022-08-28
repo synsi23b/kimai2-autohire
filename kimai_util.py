@@ -7,7 +7,7 @@ import db_util
 import re
 import urllib
 import yaml
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 dotenv.load_dotenv()
 
@@ -84,6 +84,11 @@ class Worker:
 
     def was_changed_since_last_gen(self) -> bool:
         return self._last_changed_sheet != self._last_generated_change
+
+    def last_change_older_than_minutes(self, min:int) -> bool:
+        now = datetime.utcnow()
+        delt = timedelta(seconds=min*60)
+        return (now - self._last_changed_sheet[1]) > delt
 
     def set_last_generation_sheet(self):
         db_util.set_last_generated_sheet(self._id, *self._last_changed_sheet)

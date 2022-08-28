@@ -202,7 +202,7 @@ def get_last_edited_sheet(user_id:int, sheet_date:date) -> tuple:
     end = sheet_date.replace(day= calendar.monthrange(sheet_date.year, sheet_date.month)[1])
     cnx = get_db()
     cur = cnx.cursor()
-    cur.execute(f"SELECT id, modified_at FROM timesheets WHERE user = {user_id} AND date_tz between '{start}' AND '{end}' ORDER BY modified_at DESC;")
+    cur.execute(f"SELECT id, modified_at FROM kimai2_timesheet WHERE user = {user_id} AND date_tz between '{start}' AND '{end}' ORDER BY modified_at DESC;")
     return next(cur)
 
 
@@ -220,7 +220,7 @@ def get_generation_cycle_id_dt(user_id:int):
 def set_last_generated_sheet(user_id, sheet_id, mod_at):
     cnx = get_db("dbautohire")
     cur = cnx.cursor()
-    q= f"INSERT INTO last_generated_change (id, timesheet, modified_at) VALUES({user_id}, {sheet_id}, {mod_at}) ON DUPLICATE KEY UPDATE timesheet={sheet_id}, modified_at={mod_at}"
+    q= f"INSERT INTO last_generated_change (id, timesheet, modified_at) VALUES({user_id}, {sheet_id}, '{mod_at}') ON DUPLICATE KEY UPDATE timesheet={sheet_id}, modified_at='{mod_at}'"
     cur.execute(q)
     cnx.commit()
 
@@ -276,5 +276,6 @@ if __name__ == "__main__":
     #print(sum_times_range(12, s, e))
     #_create_season()
     #_create_user_season()
+    #_create_last_generation_change()
     #print(get_generate_projects())
     # [(20, 'Werkstudent_TUD', '*generate_sheets*\r\nmax_weekly_during: 20\r\nmax_weekly_outside: 40\r\nseasons:\r\n - 14.10.2024:14.02.2025\r\n - 15.04.2024:19.07.2024\r\n - 16.10.2023:09.02.2024\r\n - 11.04.2023:14.07.2023\r\n - 17.10.2022:10.02.2023')]
