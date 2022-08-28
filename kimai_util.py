@@ -76,9 +76,17 @@ class Worker:
         # sheets are sorted ascending
         self._sum_month = db_util.sum_times_range(id, sheets[0][-1], sheets[-1][-1]) / 3600
         self._budget_month = db_util.get_worker_budget(id)
+        self._last_changed_sheet = db_util.get_last_edited_sheet(id, sheets[0][-1])
+        self._last_generated_change = db_util.get_generation_cycle_id_dt(id)
 
     def mark_sheets_exported(self):
         db_util.set_sheets_exported([s[0] for s in self._sheets])
+
+    def was_changed_since_last_gen(self) -> bool:
+        return self._last_changed_sheet != self._last_generated_change
+
+    def set_last_generation_sheet(self):
+        db_util.set_last_generated_sheet(self._id, *self._last_changed_sheet)
 
 
 class AutogenProjekt:

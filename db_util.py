@@ -1,4 +1,6 @@
+from codecs import getdecoder
 import re
+from xmlrpc.client import DateTime
 import dotenv
 import mysql.connector
 from mysql.connector import errorcode, MySQLConnection
@@ -194,6 +196,35 @@ def set_sheets_exported(sheet_ids:list):
     cnx.commit()
     
 
+def get_last_edited_sheet(user_id:int, sheet_date:date) -> tuple:
+    start = sheet_date.replace(day=1)
+    # monthrange returns a tuple (day_of_week, last_day_of_month)
+    end = sheet_date.replace(day= calendar.monthrange(sheet_date.year, sheet_date.month)[1])
+    cnx = get_db()
+    cur = cnx.cursor()
+    cur.execute(f"SELECT id, modified_at FROM timesheets WHERE user = {user_id} AND date_tz between '{start}' AND '{end}' ORDER BY modified_at DESC;")
+    return next(cur)
+
+
+def get_generation_cycle_id_dt(user_id:int):
+    cnx = get_db("dbautohire")
+    cur = cnx.cursor()
+    cur.execute(f"SELECT timesheet, modified_at FROM last_generated_change WHERE id = {user_id};")
+    try:
+        tup = next(cur)
+    except StopIteration:
+        tup = (0, datetime(year=1970, month=1, day=1, hour=0, minute=0))
+    return tup
+
+
+def set_last_generated_sheet(user_id, sheet_id, mod_at):
+    cnx = get_db("dbautohire")
+    cur = cnx.cursor()
+    q= f"INSERT INTO last_generated_change (id, timesheet, modified_at) VALUES({user_id}, {sheet_id}, {mod_at}) ON DUPLICATE KEY UPDATE timesheet={sheet_id}, modified_at={mod_at}"
+    cur.execute(q)
+    cnx.commit()
+
+
 def _create_table_autoid(name:str, fields:list):
     cnx = get_db("dbautohire")
     cur = cnx.cursor()
@@ -217,6 +248,14 @@ def _create_season():
         "end DATE"
     ]
     _create_table_autoid("seasons", fields)
+
+
+def _create_last_generation_change():
+    fields = [
+        "timesheet INT",
+        "modified_at DATETIME"
+    ]
+    _create_table_autoid("last_generated_change", fields)
 
 
 #def _create_user_season():

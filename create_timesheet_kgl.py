@@ -103,6 +103,9 @@ This report was exported and can't be changed anymore. It will be used to calcul
         logging.info(f"Working on project {proj._name}")
         workers = proj.get_workers(year, month)
         for wrk in workers:
+            if not wrk.was_changed_since_last_gen() and preliminary:
+                logging.info(f"Skipping generation for {wrk._alias} not changed")
+                continue
             logging.info(f"Generating worker {wrk._alias}")
             month_ok, month_msg = proj.is_worker_month_ok(wrk)
             weeks_ok, weeks = proj.is_worker_weeks_ok(wrk)
@@ -122,7 +125,7 @@ if __name__ == "__main__":
     format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
 
     parser = argparse.ArgumentParser(description="export timesheets for users of projects with *generate_sheets* in project description")
-    parser.add_argument("--today", action="store_true", help="use today as a time base to generate monthly report rather than last month")
+    #parser.add_argument("--today", action="store_true", help="use today as a time base to generate monthly report rather than last month")
     #parser.add_argument("--lastmonth", action="store_true", help="wether or not this generation is preliminary, e.g. not a real export")
     parser.add_argument("--preliminary", action="store_true", help="wether or not this generation is preliminary, e.g. not a real export")
 
@@ -134,9 +137,10 @@ if __name__ == "__main__":
         outf.mkdir()
     
     dt = datetime.datetime.utcnow()
+    day = dt.day
     month = dt.month
     year = dt.year
-    if not args.today:
+    if day < 15:
         month -= 1
         if month == 0:
             month = 12
@@ -151,5 +155,6 @@ if __name__ == "__main__":
 
     for w in workers:
         send_mail(w[0]._mail, subject, w[1], [w[2]])
+        w[0].set_last_generation_sheet()
         if not preliminary:
             w[0].mark_sheets_exported()
