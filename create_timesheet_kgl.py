@@ -5,6 +5,7 @@ from pathlib import Path
 from babel.dates import format_date
 from openpyxl import load_workbook
 from kimai_util import get_gen_projects
+import db_util
 import logging
 from mail import send_mail
 import argparse
@@ -112,12 +113,14 @@ This report was exported and can't be changed anymore. It will be used to calcul
         prefix = ""
     projects = get_gen_projects()
     owrk = []
+    missing = []
     for proj in projects:
         logging.info(f"Working on project {proj._name}")
         workers = proj.get_workers(year, month)
+        missing += get_workers_missing_timesheet(year, month, proj._id, workers)
         for wrk in workers:
             if not wrk.was_changed_since_last_gen() and preliminary:
-                logging.info(f"Skipping generation for {wrk._alias}: not changed")
+#                logging.info(f"Skipping generation for {wrk._alias}: not changed")
                 continue
             if not wrk.last_change_older_than_minutes(15):
                 logging.info(f"Skipping generation for {wrk._alias}: last changed recently")
@@ -132,7 +135,36 @@ This report was exported and can't be changed anymore. It will be used to calcul
                 msg += f"\n{week[1]}\n"
             repofile = fill_hours_files(wrk._alias, wrk._sheets, reportfolder, prefix)
             owrk.append((wrk, msg, repofile))
+    return owrk, missing
+
+
+def get_workers_missing_timesheet(year:int, month:int, proj_id:int, workers:list):
+    all_wrk = db_util.get_team_worker_by_project(proj_id)
+    sheet_workers = [wrk._id for wrk in workers]
+    no_sheet = [w for w in all_wrk if w[0] not in sheet_workers]
+    owrk = []
+    for wrk in no_sheet:
+        gen = db_util.get_generation_cycle_id_dt(wrk[0])
+        if (gen[1].year, gen[1].month) != (year, month):
+            owrk.append(wrk)
     return owrk
+
+
+def send_missing_sheets_msg(year, month, worker):
+    msg=f"""
+Dear {worker[2]},
+
+When generating preliminary reports for the upcoming salary calculation, we noticed you have not submitted any worktimes, yet.
+
+If you have not worked at all this month, you can ignore this message.
+
+If you have worked, you need to submit your timesheets at https://worktime.leap-in-time.de in order to get paid for this month.
+
+Thank you!
+"""
+    logging.info(f"Sending missing timesheet warning to {worker[1]}")
+    send_mail(worker[1], f"{month}-{year} No timesheet found!", msg)
+    db_util.set_missing_sheet_reminder_send(worker[0], year, month)
 
 
 if __name__ == "__main__":
@@ -162,7 +194,7 @@ if __name__ == "__main__":
             month = 12
             year -= 1
     preliminary = args.preliminary
-    workers = create_reports(year, month, preliminary, outf)
+    workers, missing = create_reports(year, month, preliminary, outf)
 
     if preliminary:
         subject = f"Preliminary worktime report {month}-{year}. Please check it before the deadline."
@@ -174,3 +206,5 @@ if __name__ == "__main__":
         w[0].set_last_generation_sheet()
         if not preliminary:
             w[0].mark_sheets_exported()
+    for m in missing:
+        send_missing_sheets_msg(year, month, m)

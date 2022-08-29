@@ -45,7 +45,7 @@ def create_from_dic(user, interactive):
                 break
     else:
         logging.info("create user non interactive")
-        logging(str(user))
+        logging.info(str(user))
         try:
             create_user(**user)
         except Exception as e:
@@ -83,6 +83,6 @@ if __name__ == "__main__":
             "lastname": str(args.userdata[1]), 
             "email": str(args.userdata[2]), 
             "usertype": str(args.userdata[3]), 
-            "monthly_hours": float(args.userdata[5])
+            "monthly_hours": float(args.userdata[4])
         }
         create_from_dic(dic, args.inter)

@@ -188,6 +188,17 @@ def get_sheets_for_project(proj_id, year:int, month:int) -> list:
     return list(cur)
 
 
+def get_team_worker_by_project(proj_id:int) -> list:
+    cnx = get_db()
+    cur = cnx.cursor(buffered=True)
+    cur.execute(f"SELECT team_id FROM kimai2_projects_teams WHERE project_id={proj_id};")
+    teams = ", ".join([str(c[0]) for c in cur])
+    cur.execute(f"SELECT user_id FROM kimai2_users_teams WHERE teamlead=0 AND team_id IN ({teams});")
+    users = ", ".join([str(c[0]) for c in cur])
+    cur.execute(f"SELECT id, email, alias FROM kimai2_users WHERE enabled=1 AND id IN ({users});")
+    return list(cur)
+
+
 def set_sheets_exported(sheet_ids:list):
     cnx = get_db()
     cur = cnx.cursor(buffered=True)
@@ -220,7 +231,16 @@ def get_generation_cycle_id_dt(user_id:int):
 def set_last_generated_sheet(user_id, sheet_id, mod_at):
     cnx = get_db("dbautohire")
     cur = cnx.cursor(buffered=True)
-    q= f"INSERT INTO last_generated_change (id, timesheet, modified_at) VALUES({user_id}, {sheet_id}, '{mod_at}') ON DUPLICATE KEY UPDATE timesheet={sheet_id}, modified_at='{mod_at}'"
+    q= f"INSERT INTO last_generated_change (id, timesheet, modified_at) VALUES({user_id}, {sheet_id}, '{mod_at}') ON DUPLICATE KEY UPDATE timesheet={sheet_id}, modified_at='{mod_at}';"
+    cur.execute(q)
+    cnx.commit()
+
+
+def set_missing_sheet_reminder_send(user_id:int, year:int, month:int):
+    mod_at = datetime(year, month, 1, 0, 0, 0, 0)
+    cnx = get_db("dbautohire")
+    cur = cnx.cursor(buffered=True)
+    q= f"INSERT INTO last_generated_change (id, timesheet, modified_at) VALUES({user_id}, 0, '{mod_at}') ON DUPLICATE KEY UPDATE timesheet=0, modified_at='{mod_at}';"
     cur.execute(q)
     cnx.commit()
 
@@ -279,3 +299,4 @@ if __name__ == "__main__":
     #_create_last_generation_change()
     #print(get_generate_projects())
     # [(20, 'Werkstudent_TUD', '*generate_sheets*\r\nmax_weekly_during: 20\r\nmax_weekly_outside: 40\r\nseasons:\r\n - 14.10.2024:14.02.2025\r\n - 15.04.2024:19.07.2024\r\n - 16.10.2023:09.02.2024\r\n - 11.04.2023:14.07.2023\r\n - 17.10.2022:10.02.2023')]
+    print(get_team_worker_by_project(20))
