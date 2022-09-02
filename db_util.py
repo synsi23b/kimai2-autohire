@@ -1,6 +1,4 @@
-from codecs import getdecoder
 import re
-from xmlrpc.client import DateTime
 import dotenv
 import mysql.connector
 from mysql.connector import errorcode, MySQLConnection
@@ -217,6 +215,16 @@ def get_last_edited_sheet(user_id:int, sheet_date:date) -> tuple:
     return next(cur)
 
 
+def get_open_sheets(user_id:int, year:int, month:int) -> list:
+    start = date(year, month, 1)
+    # monthrange returns a tuple (day_of_week, last_day_of_month)
+    end = date(year, month, calendar.monthrange(year, month)[1])
+    cnx = get_db()
+    cur = cnx.cursor(buffered=True)
+    cur.execute(f"SELECT id, start_time, timezone FROM kimai2_timesheet WHERE user = {user_id} AND end_time IS NULL AND date_tz between '{start}' AND '{end}';")
+    return list(cur)
+
+
 def get_generation_cycle_id_dt(user_id:int):
     cnx = get_db("dbautohire")
     cur = cnx.cursor(buffered=True)
@@ -242,6 +250,27 @@ def set_missing_sheet_reminder_send(user_id:int, year:int, month:int):
     cur = cnx.cursor(buffered=True)
     q= f"INSERT INTO last_generated_change (id, timesheet, modified_at) VALUES({user_id}, 0, '{mod_at}') ON DUPLICATE KEY UPDATE timesheet=0, modified_at='{mod_at}';"
     cur.execute(q)
+    cnx.commit()
+
+
+def open_warning_older_than_hours(sheet_id:int, hours:float) -> bool:
+    cnx = get_db("dbautohire")
+    cur = cnx.cursor(buffered=True)
+    cur.execute(f"SELECT warning_time FROM open_sheet_warning WHERE id = {sheet_id};")
+    try:
+        wt = next(cur)[0]
+    except StopIteration:
+        return True
+    now = datetime.utcnow()
+    delt = timedelta(hours=hours)
+    return (now - wt) > delt
+
+
+def set_open_timesheet_warning_send(sheet_id:int):
+    cnx = get_db("dbautohire")
+    cur = cnx.cursor(buffered=True)
+    now = datetime.utcnow()
+    cur.execute(f"INSERT INTO open_sheet_warning (id, warning_time) VALUES({sheet_id}, '{now}') ON DUPLICATE KEY UPDATE warning_time='{now}';")
     cnx.commit()
 
 
@@ -278,6 +307,13 @@ def _create_last_generation_change():
     _create_table_autoid("last_generated_change", fields)
 
 
+def _create_open_sheet_warning():
+    fields = [
+        "warning_time DATETIME"
+    ]
+    _create_table_autoid("open_sheet_warning", fields)
+
+
 #def _create_user_season():
 # dont need this table, just alwayrs reference timeshit->proj_id->season
 #    fields = [
@@ -299,4 +335,5 @@ if __name__ == "__main__":
     #_create_last_generation_change()
     #print(get_generate_projects())
     # [(20, 'Werkstudent_TUD', '*generate_sheets*\r\nmax_weekly_during: 20\r\nmax_weekly_outside: 40\r\nseasons:\r\n - 14.10.2024:14.02.2025\r\n - 15.04.2024:19.07.2024\r\n - 16.10.2023:09.02.2024\r\n - 11.04.2023:14.07.2023\r\n - 17.10.2022:10.02.2023')]
-    print(get_team_worker_by_project(20))
+    #print(get_team_worker_by_project(20))
+    _create_open_sheet_warning()

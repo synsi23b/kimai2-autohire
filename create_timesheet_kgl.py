@@ -100,7 +100,7 @@ This is your worktime report for {month}-{year}.
         bmsg += """
 This report is not the final report used for salary calculations, so please check it for any errors.
 
-The final report will be generated on the 3rd of the following month.
+The final report will be generated on the 7th of the following month.
 """
     else:
         bmsg += """
@@ -109,23 +109,38 @@ This report was exported and can't be changed anymore. It will be used to calcul
 
     if preliminary:
         prefix = "Preliminary-"
+        subject = f"Preliminary worktime report {month}-{year}. Please check it before 7th."
     else:
         prefix = ""
+        subject = f"Exported worktime report {month}-{year}."
+
     projects = get_gen_projects()
     owrk = []
     missing = []
+    timenow = datetime.datetime.utcnow()
     for proj in projects:
         logging.info(f"Working on project {proj._name}")
         workers = proj.get_workers(year, month)
         missing += get_workers_missing_timesheet(year, month, proj._id, workers)
         for wrk in workers:
-            if not wrk.was_changed_since_last_gen() and preliminary:
+            open_sheets_warn = 0
+            open_sheets = wrk.get_open_sheets(year, month)
+            if open_sheets:
+                osheet_msg = ""
+                for tid, st, tz in open_sheets:
+                    if (timenow - st) > datetime.timedelta(hours=12) and db_util.open_warning_older_than_hours(tid, 13):
+                        subject = f"Warning: running timesheets for {month}-{year} detect. Please check it before 7th."
+                        open_sheets_warn = tid
+                        osheet_msg += utc_unaware_to_tz(st, tz).strftime('\n%Y %B %d\n')
+                if open_sheets_warn != 0:
+                    bmsg = f"{bmsg}\n\nYou got running timesheets started at:\n\n{osheet_msg}\n\nTimesheets need to be stopped to be included in the salary calculation.\n\n\n"
+            if not wrk.was_changed_since_last_gen() and preliminary and open_sheets_warn == 0:
 #                logging.info(f"Skipping generation for {wrk._alias}: not changed")
                 continue
-            if not wrk.last_change_older_than_minutes(15):
+            if not wrk.last_change_older_than_minutes(15) and open_sheets_warn == 0:
                 logging.info(f"Skipping generation for {wrk._alias}: last changed recently")
                 continue
-            logging.info(f"Generating worker {wrk._alias}")
+            logging.info(f"Generating worker {wrk._alias} open_sheet: {open_sheets_warn}")
             month_ok, month_msg = proj.is_worker_month_ok(wrk)
             weeks_ok, weeks = proj.is_worker_weeks_ok(wrk)
             msg = bmsg + month_msg
@@ -134,7 +149,7 @@ This report was exported and can't be changed anymore. It will be used to calcul
             for week in weeks:
                 msg += f"\n{week[1]}\n"
             repofile = fill_hours_files(wrk._alias, wrk._sheets, reportfolder, prefix)
-            owrk.append((wrk, msg, repofile))
+            owrk.append((wrk, subject, msg, repofile, open_sheets_warn))
     return owrk, missing
 
 
@@ -174,8 +189,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="export timesheets for users of projects with *generate_sheets* in project description")
     #parser.add_argument("--today", action="store_true", help="use today as a time base to generate monthly report rather than last month")
-    #parser.add_argument("--lastmonth", action="store_true", help="wether or not this generation is preliminary, e.g. not a real export")
-    parser.add_argument("--preliminary", action="store_true", help="wether or not this generation is preliminary, e.g. not a real export")
+    #parser.add_argument("--lastmonth", action="store_true", help="whether or not this generation is preliminary, e.g. not a real export")
+    parser.add_argument("--preliminary", action="store_true", help="whether or not this generation is preliminary, e.g. not a real export")
 
     args = parser.parse_args()
 
@@ -196,14 +211,14 @@ if __name__ == "__main__":
     preliminary = args.preliminary
     workers, missing = create_reports(year, month, preliminary, outf)
 
-    if preliminary:
-        subject = f"Preliminary worktime report {month}-{year}. Please check it before the deadline."
-    else:
-        subject = f"Exported worktime report {month}-{year}."
-
     for w in workers:
-        send_mail(w[0]._mail, subject, w[1], [w[2]])
-        w[0].set_last_generation_sheet()
+        # address, subject, txt-msg, attachments
+        send_mail(w[0]._mail, w[1], w[2], [w[3]])
+        # check for warning based on open sheets
+        if w[4] != 0:
+            db_util.set_open_timesheet_warning_send(w[4])
+        else:
+            w[0].set_last_generation_sheet()
         if not preliminary:
             w[0].mark_sheets_exported()
     for m in missing:

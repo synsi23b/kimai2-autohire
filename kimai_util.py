@@ -1,6 +1,4 @@
-from http.client import responses
 import subprocess
-from xmlrpc.client import Boolean
 import dotenv
 from os import getenv
 import db_util
@@ -92,6 +90,9 @@ class Worker:
 
     def set_last_generation_sheet(self):
         db_util.set_last_generated_sheet(self._id, *self._last_changed_sheet)
+
+    def get_open_sheets(self, year, month):
+        return db_util.get_open_sheets(self._id, year, month)
 
 
 class AutogenProjekt:
