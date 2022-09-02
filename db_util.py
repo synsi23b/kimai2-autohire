@@ -184,7 +184,7 @@ def get_sheets_for_project(proj_id, year:int, month:int) -> list:
     end = date(year, month, calendar.monthrange(year, month)[1])
     cnx = get_db()
     cur = cnx.cursor(buffered=True)
-    cur.execute(f"SELECT * FROM kimai2_timesheet WHERE project_id = {proj_id} AND date_tz between '{start}' AND '{end}' ORDER BY start_time ASC;")
+    cur.execute(f"SELECT * FROM kimai2_timesheet WHERE project_id = {proj_id} AND end_time IS NOT NULL AND date_tz between '{start}' AND '{end}' ORDER BY start_time ASC;")
     return list(cur)
 
 
@@ -210,10 +210,10 @@ def set_sheets_exported(sheet_ids:list):
 def get_last_edited_sheet(user_id:int, sheet_date:date) -> tuple:
     start = sheet_date.replace(day=1)
     # monthrange returns a tuple (day_of_week, last_day_of_month)
-    end = sheet_date.replace(day= calendar.monthrange(sheet_date.year, sheet_date.month)[1])
+    end = sheet_date.replace(day=calendar.monthrange(sheet_date.year, sheet_date.month)[1])
     cnx = get_db()
     cur = cnx.cursor(buffered=True)
-    cur.execute(f"SELECT id, modified_at FROM kimai2_timesheet WHERE user = {user_id} AND date_tz between '{start}' AND '{end}' ORDER BY modified_at DESC;")
+    cur.execute(f"SELECT id, modified_at FROM kimai2_timesheet WHERE user = {user_id} AND end_time IS NOT NULL AND date_tz between '{start}' AND '{end}' ORDER BY modified_at DESC;")
     return next(cur)
 
 

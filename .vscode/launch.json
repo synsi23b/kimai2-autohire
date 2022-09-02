@@ -13,13 +13,22 @@
             "justMyCode": true
         },
         {
-            "name": "Python: create form csv",
+            "name": "create users form csv",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/create_user.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": ["--file", "files/createusers.csv"]
+        },
+        {
+            "name": "send preliminary wt reports",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/create_timesheet_kgl.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--preliminary"]
         }
     ]
 }
