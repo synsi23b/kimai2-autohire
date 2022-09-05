@@ -69,7 +69,9 @@ def fill_hours_files(alias:str, sheets:list, outfolder:Path, fileprefix:str = ""
                 # cells already written by 24h roll over -> adjust start and end time for today
                 start = datetime.datetime.strptime(wsheet[f"E{row}"], "%H:%M:%S")
                 end = start + duration
-            wsheet[f"C{row}"] = "start gestern; " + work_contents
+                wsheet[f"C{row}"] = "start gestern; " + work_contents
+            else:
+                wsheet[f"C{row}"] = work_contents
             wsheet[f"D{row}"] = start.strftime("%H:%M:00")
             wsheet[f"E{row}"] = end.strftime("%H:%M:00")
         else:
