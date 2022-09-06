@@ -15,6 +15,8 @@ create tables in this database:
 
 db_util ->
   - _create_last_generation
+
+
 ## basic setup
 1. after cloning into home directory, install requirements in a virtual environment called venv
 ```bash
@@ -24,6 +26,11 @@ pip3 install -r requirements.txt
 ```
 2. some information like the database and email information gets read from the kimai env file, so make sure kimai is in the default path */var/www/kimai2* and its environment file is populated
 3. setup crontabs to run for a user that can read the kimai env file, for an example see work-life-checker.
+4. install libreoffice for commandline xlsx -> pdf conversion
+```bash
+apt install libreoffice --no-install-recommends  --no-install-suggests
+```
+
 
 ## cron entries
 ```bash

@@ -9,7 +9,9 @@ import db_util
 import logging
 from mail import send_mail
 import argparse
+import calendar
 import convertapi
+
 
 
 convertapi.api_secret = 'DsVuSJPj5aOIZPxE'
@@ -41,7 +43,9 @@ def fill_hours_files(alias:str, sheets:list, outfolder:Path, fileprefix:str = ""
     wsheet["A11"] = alias
     wsheet["E11"] = format_date(sheets[0][-1], "MMMM", locale="de")
     wsheet["F11"] = sheets[0][-1].year
-    wsheet["A14"] = str(sheets[0][-1].replace(day=1))
+    maxday = calendar.monthrange(sheets[0][-1].year, sheets[0][-1].month)[1]
+    for d in range(1, maxday+1):
+        wsheet[f"A{13+d}"] = str(sheets[0][-1].replace(day=d))
 
     # group sheets generated for the same day in the users TZ
     same_day = {}
@@ -93,6 +97,7 @@ def fill_hours_files(alias:str, sheets:list, outfolder:Path, fileprefix:str = ""
     outf = outfolder / fname
     workbook.save(filename=str(outf))
     if fileprefix == "":
+        # libreoffice --headless --convert-to pdf reports_kgl/mycoolfile.xlsx
         logging.info(f"Converting to pdf {outf}")
         result = convertapi.convert('pdf', { 'File': str(outf) })
         outf = outf.with_suffix(".pdf")
