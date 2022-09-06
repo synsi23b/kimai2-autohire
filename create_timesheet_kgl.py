@@ -9,6 +9,10 @@ import db_util
 import logging
 from mail import send_mail
 import argparse
+import convertapi
+
+
+convertapi.api_secret = 'DsVuSJPj5aOIZPxE'
 
 
 def utc_unaware_to_tz(dt:datetime, tz) -> datetime:
@@ -88,6 +92,13 @@ def fill_hours_files(alias:str, sheets:list, outfolder:Path, fileprefix:str = ""
     fname = fileprefix + fname.replace("MM_JJ", start.strftime("%m_%y")).replace("Mitarbeiter", alias.replace(" ", "_"))
     outf = outfolder / fname
     workbook.save(filename=str(outf))
+    if fileprefix == "":
+        logging.info(f"Converting to pdf {outf}")
+        result = convertapi.convert('pdf', { 'File': str(outf) })
+        outf = outf.with_suffix(".pdf")
+        result.file.save(str(outf))
+        user_info = convertapi.user()
+        logging.info(f"Convertapi conversion done. Cost: {result.conversion_cost} Seconds left: {user_info['SecondsLeft']}")
     return outf
 
 

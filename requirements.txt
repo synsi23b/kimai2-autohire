@@ -6,3 +6,4 @@ pytz
 babel
 openpyxl
 pillow
+convertapi
