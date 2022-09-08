@@ -7,3 +7,7 @@ babel
 openpyxl
 pillow
 convertapi
+selenium
+PyVirtualDisplay
+webdriver-manager
+PyPDF2

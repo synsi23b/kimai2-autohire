@@ -6,7 +6,7 @@ YEARLONG=`date +%Y -d 'last month'`
 YEAR=`echo $YEARLONG | cut -c 3,4`
 MONTH=`date +%m -d 'last month'`
 
-SRC="/var/lib/lxd/containers/kimai/rootfs/home/ubuntu/export/*${MONTH}_${YEAR}*.xlsx"
+SRC="/var/lib/lxd/containers/kimai/rootfs/home/ubuntu/reports_kgl/Stundenzettel*${MONTH}_${YEAR}*.pdf"
 DST="/media/softwareraid/nextcloud/__groupfolders/2/STUNDENZETTEL/$YEARLONG/$MONTH"
 DSTP="/media/softwareraid/nextcloud/__groupfolders/2/STUNDENZETTEL/$YEARLONG"
 

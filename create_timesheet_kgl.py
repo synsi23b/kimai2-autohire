@@ -11,10 +11,10 @@ from mail import send_mail
 import argparse
 import calendar
 import convertapi
+from kgl_online import WebPortal
 
 
-
-convertapi.api_secret = 'DsVuSJPj5aOIZPxE'
+THIS_LOCATION = Path(__file__).parent.resolve()
 
 
 def utc_unaware_to_tz(dt:datetime, tz) -> datetime:
@@ -24,12 +24,11 @@ def utc_unaware_to_tz(dt:datetime, tz) -> datetime:
 
 def fill_hours_files(alias:str, sheets:list, outfolder:Path, fileprefix:str = ""):
     company_data = {}
-    this_location = Path(__file__).parent.resolve()
-    #print(this_location.parent)
-    with open(str(this_location.parent / "kgl_info.yaml")) as inf:
+    #print(THIS_LOCATION.parent)
+    with open(str(THIS_LOCATION.parent / "kgl_info.yaml")) as inf:
         company_data = yaml.load(inf, yaml.Loader)
     fname = "Stundenzettel MM_JJ - Mitarbeiter_Lohn.xlsx"
-    folder = this_location / "files"
+    folder = THIS_LOCATION / "files"
     workbook = load_workbook(filename=str(folder / fname))
     wsheet = workbook.active
 
@@ -200,11 +199,8 @@ Thank you!
     db_util.set_missing_sheet_reminder_send(worker[0], year, month)
 
 
-if __name__ == "__main__":
-    thisfile = Path(__file__).resolve()
-    logging.basicConfig(filename=str(thisfile.parent.parent / f"kimai2_autohire_{thisfile.stem}.log"), 
-    format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
-
+def main(kgl_cred):
+    convertapi.api_secret = kgl_cred["convertapi"]
     parser = argparse.ArgumentParser(description="export timesheets for users of projects with *generate_sheets* in project description")
     #parser.add_argument("--today", action="store_true", help="use today as a time base to generate monthly report rather than last month")
     #parser.add_argument("--lastmonth", action="store_true", help="whether or not this generation is preliminary, e.g. not a real export")
@@ -229,6 +225,7 @@ if __name__ == "__main__":
     preliminary = args.preliminary
     workers, missing = create_reports(year, month, preliminary, outf)
 
+    report_to_kgl = []
     for w in workers:
         # address, subject, txt-msg, attachments
         send_mail(w[0]._mail, w[1], w[2], [w[3]])
@@ -239,5 +236,25 @@ if __name__ == "__main__":
             w[0].set_last_generation_sheet()
         if not preliminary:
             w[0].mark_sheets_exported()
+            report_to_kgl.append(str(w[3]))
     for m in missing:
         send_missing_sheets_msg(year, month, m)
+    if report_to_kgl:
+        # open kgl webprotal and send message with attachments
+        with WebPortal(kgl_cred) as kgl:
+            kgl.login()
+            kgl.upload_timesheets(report_to_kgl, year, month)
+    return 0
+
+if __name__ == "__main__":
+    thisfile = Path(__file__).resolve()
+    logging.basicConfig(filename=str(thisfile.parent.parent / f"kimai2_autohire_{thisfile.stem}.log"), 
+    format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
+    try:
+        with open(str(THIS_LOCATION.parent / "kgl_cred.yaml")) as inf:
+            kgl_cred = yaml.load(inf, yaml.Loader)
+        ret = main(kgl_cred)
+    except Exception as e:
+        logging.exception(f"Uncaught exception in from main! {e}")
+        ret = -1
+    exit(ret)
