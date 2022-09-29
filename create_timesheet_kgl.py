@@ -160,11 +160,14 @@ This report was exported and can't be changed anymore. It will be used to calcul
             logging.info(f"Generating worker {wrk._alias} open_sheet: {open_sheets_warn}")
             month_ok, month_msg = proj.is_worker_month_ok(wrk)
             weeks_ok, weeks = proj.is_worker_weeks_ok(wrk)
+            days_ok, days_msg = proj.is_days_ok(wrk)
             msg = bmsg + month_msg
             if not weeks_ok:
                 msg += "\n\n!! You worked to many hours in one of the weeks !!\n"
             for week in weeks:
                 msg += f"\n{week[1]}\n"
+            if not days_ok:
+                msg += days_msg
             repofile = fill_hours_files(wrk._alias, wrk._sheets, reportfolder, prefix)
             owrk.append((wrk, subject, msg, repofile, open_sheets_warn))
     return owrk, missing

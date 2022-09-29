@@ -8,6 +8,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 import logging
+from datetime import datetime
 
 
 def send_mail(receiver:list, subject:str, plain:str, attachments=[], html=""):
@@ -74,13 +75,18 @@ def _send_mail(receiver:list, subject:str, plain:str, attachments=[], html=""):
             server.ehlo()  # Can be omitted
             server.login(sender, passw)
             server.sendmail(sender, receiver, msg)
+    report = f"TO: {receiver}\nATT: {[a.name for a in attachments]}\n\n{plain}\n\n{html}"
+    mailf = Path(__file__).resolve().parent / "mails"
+    ofname = f"{datetime.now().replace(microsecond=0)}  {receiver}"
+    with open(str(mailf / ofname), "w") as outf:
+        outf.write(report)
 
 
 def get_absolute_path(filename:str) -> Path:
-    thisf = Path(__file__)
+    thisf = Path(__file__).resolve()
     filesfold = thisf.parent / "files"
     filep = filesfold / filename
-    return filep.absolute()
+    return filep
 
 
 def encapsulate_html_with_body(contents):

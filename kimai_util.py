@@ -166,6 +166,17 @@ class AutogenProjekt:
             else:
                 weeks.append((True, resp))
         return weeks_ok, weeks
+
+    def is_days_ok(self, worker:Worker):
+        days =[]
+        for she in worker._sheets:
+            # check if the duration of a single entry is greater than 11 hours
+            if she[6] > (11 * 60 * 60):
+                days.append(str(she[-1]))
+        if len(days) == 0:
+            return True, ""
+        prt = "\n - ".join(days)
+        return False, f"!! There are entries with a length greater than 11 hours, are you sure this is correct?\n\nThese are the days on which this occured:{prt}\n\n\n"
             
 
 def get_gen_projects():
