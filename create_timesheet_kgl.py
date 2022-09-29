@@ -12,6 +12,7 @@ import argparse
 import calendar
 import convertapi
 from kgl_online import WebPortal
+import shutil
 
 
 THIS_LOCATION = Path(__file__).parent.resolve()
@@ -243,6 +244,12 @@ def main(kgl_cred):
     for m in missing:
         send_missing_sheets_msg(year, month, m)
     if report_to_kgl:
+        # add files not included with kimai as abspath from special folder, pdf only
+        extras = THIS_LOCATION / "kgl_extra_upload"
+        for path in extras.glob("./*.pdf"):
+            abspath = str(path.resolve())
+            report_to_kgl.append(abspath)
+            shutil.move(abspath, THIS_LOCATION.parent / f"reports_kgl/{path.name}")
         # open kgl webprotal and send message with attachments
         with WebPortal(kgl_cred) as kgl:
             kgl.login()
