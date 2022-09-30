@@ -137,7 +137,7 @@ This report was exported and can't be changed anymore. It will be used to calcul
     missing = []
     timenow = datetime.datetime.utcnow()
     for proj in projects:
-        logging.info(f"Working on project {proj._name}")
+        #logging.info(f"Working on project {proj._name}")
         workers = proj.get_workers(year, month)
         missing += get_workers_missing_timesheet(year, month, proj._id, workers)
         for wrk in workers:
