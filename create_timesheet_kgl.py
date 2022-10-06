@@ -118,7 +118,7 @@ This is your worktime report for {month}-{year}.
         bmsg += """
 This report is not the final report used for salary calculations, so please check it for any errors.
 
-The final report will be generated on the 7th of the following month.
+The final report will be generated on the 4th of the following month.
 """
     else:
         bmsg += """
@@ -127,7 +127,7 @@ This report was exported and can't be changed anymore. It will be used to calcul
 
     if preliminary:
         prefix = "Preliminary-"
-        subject = f"Preliminary worktime report {month}-{year}. Please check it before 7th."
+        subject = f"Preliminary worktime report {month}-{year}. Please check it before 4th."
     else:
         prefix = ""
         subject = f"Exported worktime report {month}-{year}."
@@ -212,10 +212,10 @@ def main(kgl_cred):
 
     args = parser.parse_args()
 
-    outf = thisfile.parent.parent / "reports_kgl"
-    if not outf.is_dir():
+    reportfolder = thisfile.parent.parent / "reports_kgl"
+    if not reportfolder.is_dir():
         logging.info("report folder not found, creating it")
-        outf.mkdir()
+        reportfolder.mkdir()
     
     dt = datetime.datetime.utcnow()
     day = dt.day
@@ -227,7 +227,7 @@ def main(kgl_cred):
             month = 12
             year -= 1
     preliminary = args.preliminary
-    workers, missing = create_reports(year, month, preliminary, outf)
+    workers, missing = create_reports(year, month, preliminary, reportfolder)
 
     report_to_kgl = []
     for w in workers:
@@ -248,8 +248,9 @@ def main(kgl_cred):
         extras = THIS_LOCATION / "kgl_extra_upload"
         for path in extras.glob("./*.pdf"):
             abspath = str(path.resolve())
-            report_to_kgl.append(abspath)
-            shutil.move(abspath, THIS_LOCATION.parent / f"reports_kgl/{path.name}")
+            dstpath = str(reportfolder / path.name)
+            shutil.move(abspath, dstpath)
+            report_to_kgl.append(dstpath)
         # open kgl webprotal and send message with attachments
         with WebPortal(kgl_cred) as kgl:
             kgl.login()

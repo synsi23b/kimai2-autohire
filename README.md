@@ -7,7 +7,7 @@ programmed against kimai version 1.21
 ## apt
 
 ```bash
-sudo apt install xvfb
+sudo apt install xvfb firefox
 # maybe no libre office. the pdf it makes is not good. Tweak the template file and it might work
 # used to make pdfs from the xlsx timesheets instead of convertapi
 sudo apt install libreoffice --no-install-recommends  --no-install-suggests
@@ -41,9 +41,9 @@ pip3 install -r requirements.txt
 # create worklife report on sundays
 45 23 * * 0 lxc exec kimai -- /root/wlifecheck.bash >/dev/null 2>&1 && curl -fsS --retry 3 https://hc-ping.com/secret> /dev/null
 # create preliminary timesheet exports on the first wednesday that is on or after the 25th
-30 6 25-31 * 3 lxc exec kimai -- /root/prelim.bash >/dev/null 2>&1 && curl -fsS --retry 3 https://hc-ping.com/secret > /dev/null
+*/15 * 28-31,1-3 * * lxc exec kimai -- /root/prelim.bash >/dev/null 2>&1 && curl -fsS --retry 3 https://hc-ping.com/secret > /dev/null
 # export final timesheet on the first monday noon that is on or after the 3rd
-0 10 3-9 * 1 /root/export_to_nc.bash >/dev/null 2>&1 && curl -fsS --retry 3 https://hc-ping.com/secret > /dev/null
+0 4 4 * * /root/export_to_nc.bash >/dev/null 2>&1 && curl -fsS --retry 3 https://hc-ping.com/secret > /dev/null
 ```
 
 
