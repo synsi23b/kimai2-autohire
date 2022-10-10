@@ -112,6 +112,6 @@ Further checks done by the script:
 - warn users about overwork in a week or month
 - warn users that have no timesheet at all
 
-The script should be run a lot of times during the end of month period with the preliminary flag to get everyone's timesheets in order. If a user changes something, this change will be detected and they will get another mail after at least 15 minutes have passed since the last change.
+The script should be run a lot of times during the end of month period with the preliminary flag to get everyone's timesheets in order. If a user changes something, this change will be detected, they will get another mail after at least 15 minutes have passed since the last change.
 
-Without the preliminary flag, the script should only be run one time sometime at the start of the new month. It will create PDFs of the timesheets using convertapi. These can be uploaded to the Nextcloud and KGL. The upload to KGL is done via selenium and might brake should they change their website. Similarily, convertapi needs a fresh api token every now and than, unless you pay for it.
+Without the preliminary flag, the script should only be run one time sometime at the start of the new month. It will create PDFs of the timesheets using convertapi. These can be uploaded to the Nextcloud and KGL. The upload to KGL is done via selenium and might brake should they change their website. Similarily, convertapi needs a fresh api token every now and then, unless you pay for it. Consider changing to adifferent way to create the PDFs. libreoffice (is kind of bad atm. scaling is off)

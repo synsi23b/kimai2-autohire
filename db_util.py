@@ -5,6 +5,10 @@ from mysql.connector import errorcode, MySQLConnection
 from pathlib import Path
 from datetime import datetime, date, timedelta
 import calendar
+import pytz
+
+
+UTC = pytz.timezone("UTC")
 
 
 envfile = Path(__file__).resolve().parent / ".env"
@@ -59,10 +63,13 @@ def set_user_alias(user:str, firstname:str, lastname:str):
     cnx.commit()
 
 
-def get_user_id(user:str) -> int:
+def get_user_id(user:str, is_alias=False) -> int:
     cnx = get_db()
     cur = cnx.cursor(buffered=True)
-    cur.execute(f"SELECT id FROM kimai2_users WHERE username = '{user}';")
+    if is_alias:
+        cur.execute(f"SELECT id FROM kimai2_users WHERE alias = '{user}';")
+    else:
+        cur.execute(f"SELECT id FROM kimai2_users WHERE username = '{user}';")
     return next(cur)[0]
 
 
@@ -107,6 +114,18 @@ def get_project_for_type(usertype:str):
     cur = cnx.cursor(buffered=True)
     cur.execute(f"SELECT id, customer_id FROM kimai2_projects WHERE name = '{usertype}';")
     return next(cur)
+
+
+def get_private_project_activity_for_user(user:int):
+    cnx = get_db()
+    cur = cnx.cursor(buffered=True)
+    cur.execute(f"SELECT team_id FROM kimai2_users_teams WHERE user_id = {user};")
+    team_id = next(cur)[0]
+    cur.execute(f"SELECT project_id FROM kimai2_projects_teams WHERE team_id = {team_id};")
+    proj_id = next(cur)[0]
+    cur.execute(f"SELECT project_id FROM kimai2_activities_teams WHERE team_id = {team_id};")
+    acti_id = next(cur)[0]
+    return proj_id, acti_id
 
 
 def get_project_rate(projid:int) -> float:
@@ -223,6 +242,27 @@ def get_open_sheets(user_id:int, year:int, month:int) -> list:
     cur = cnx.cursor(buffered=True)
     cur.execute(f"SELECT id, start_time, timezone FROM kimai2_timesheet WHERE user = {user_id} AND end_time IS NULL AND date_tz between '{start}' AND '{end}';")
     return list(cur)
+
+
+def insert_timesheet(user_id:int, activity_id:int, project_id:int, start:datetime, end:datetime, description:str, exported:bool, hourly_rate:float):
+    tz = "Europe/Berlin"
+    datetz = start.date()
+    start = start.astimezone(UTC)
+    end = end.astimezone(UTC)
+    durs = int((end - start).total_seconds())
+    durh = durs / 3600
+    rate = hourly_rate * durh
+    cnx = get_db()
+    cur = cnx.cursor(buffered=True)
+    querry = "INSERT INTO kimai2_timesheet("
+    "id, user, activity_id, project_id, start_time, end_time, "
+    "duration, description, rate, hourly_rate, exported, "
+    "timezone, internal_rate, modified_at, date_tz) "
+    f"VALUES (NULL, {user_id}, {activity_id}, {project_id}, '{start}', '{end}', "
+    f"{durs}, '{description}', {rate}, {hourly_rate}, {int(exported)}, "
+    f"'{tz}', {rate}, '2022-07-01 00:00:00', '{datetz}');"
+    cur.execute(querry)
+    cnx.commit()
 
 
 def get_generation_cycle_id_dt(user_id:int):
