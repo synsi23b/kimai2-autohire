@@ -58,6 +58,14 @@ def get_db(override_dbname="") -> MySQLConnection:
         return cnx
 
 
+def get_user_by_role(role:str):
+    role = role.upper()
+    cnx = get_db()
+    cur = cnx.cursor(buffered=True)
+    cur.execute(f"SELECT * FROM kimai2_users WHERE INSTR(roles, '{role}');")
+    return cur
+
+
 def set_user_alias(user:str, firstname:str, lastname:str):
     name = f"{firstname} {lastname}"
     cnx = get_db()
@@ -79,14 +87,14 @@ def get_user_id(user:str, is_alias=False) -> int:
 def get_user_registration_date(id:int) -> datetime:
     cnx = get_db()
     cur = cnx.cursor(buffered=True)
-    cur.execute(f"SELECT registration_date FROM kimai2_users WHERE id = {id}")
+    cur.execute(f"SELECT registration_date FROM kimai2_users WHERE id = {id};")
     return next(cur)[0]
 
 
 def get_user_preferences(id:int) -> dict:
     cnx = get_db()
     cur = cnx.cursor(buffered=True)
-    cur.execute(f"SELECT name, value FROM kimai2_user_preferences WHERE user_id = {id}")
+    cur.execute(f"SELECT name, value FROM kimai2_user_preferences WHERE user_id = {id};")
     return dict(cur)
 
 

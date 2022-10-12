@@ -1,6 +1,6 @@
 import argparse
 from datetime import datetime
-from kimai_util import get_gen_projects
+from kimai_util import Werkstudent
 from pathlib import Path
 import logging
 
@@ -8,12 +8,8 @@ THIS_LOCATION = Path(__file__).parent.resolve()
 
 
 def main():
-    projects = get_gen_projects()
-    workers = []
-    for pr in projects:
-        workers += pr.get_workers()
-    for wr in workers:
-        print(wr._alias, wr.get_holiday_eligibility())
+    for ws in Werkstudent.get_all_active():
+        print(ws._alias, ws.get_holiday_eligibility())
     return 0
 
 

@@ -63,6 +63,31 @@ def create_activity(usertype:str, user:str, hours:float):
     db_util.link_team_proj_customer(team_id, proj_id, custom_id)
 
 
+class Werkstudent:
+    def __init__(self, row):
+        self._id = row[0]
+        self._user = row[1]
+        self._email = row[2]
+        self._alias = row[4]
+        self._registration = row[6]
+        self._preferences = db_util.get_user_preferences(self._id)
+
+    @staticmethod
+    def get_all_active():
+        return [Werkstudent(row) for row in db_util.get_user_by_role("WERKSTUDENT")]
+
+    def get_holiday_eligibility(self):
+        now = datetime.now()
+        employeed_days = int((now - self._registration).total_seconds() / 86400)
+        weeks = employeed_days / 7
+        total_hours = db_util.sum_times_range(self._id, self._registration, now) / 3600
+        average_weekly = total_hours / weeks
+        holiday_hours = HOLIDAY_FULLTIME_EMPLOYEE_HOURS * average_weekly / 40
+        holiday_days = holiday_hours / 8
+        holiday_taken = db_util.get_user_holidays_taken(self._id)
+        return average_weekly, holiday_days, holiday_taken
+
+
 class Worker:
     def __init__(self, id:int, sheets:list):
         self._id = id
