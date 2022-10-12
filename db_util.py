@@ -11,6 +11,9 @@ import pytz
 UTC = pytz.timezone("UTC")
 
 
+HOLIDAY_STUDENT_ACTI_ID = 11
+
+
 envfile = Path(__file__).resolve().parent / ".env"
 if envfile.is_file():
     env = dotenv.dotenv_values(envfile)
@@ -71,6 +74,20 @@ def get_user_id(user:str, is_alias=False) -> int:
     else:
         cur.execute(f"SELECT id FROM kimai2_users WHERE username = '{user}';")
     return next(cur)[0]
+
+
+def get_user_registration_date(id:int) -> datetime:
+    cnx = get_db()
+    cur = cnx.cursor(buffered=True)
+    cur.execute(f"SELECT registration_date FROM kimai2_users WHERE id = {id}")
+    return next(cur)[0]
+
+
+def get_user_preferences(id:int) -> dict:
+    cnx = get_db()
+    cur = cnx.cursor(buffered=True)
+    cur.execute(f"SELECT name, value FROM kimai2_user_preferences WHERE user_id = {id}")
+    return dict(cur)
 
 
 def check_username_free(user:str):
@@ -184,6 +201,16 @@ def sum_times_range(user_id:int, start, end) -> float:
     cnx = get_db()
     cur = cnx.cursor(buffered=True)
     cur.execute(f"SELECT SUM(duration) FROM kimai2_timesheet WHERE user = {user_id} AND date_tz between '{start}' AND '{end}';")
+    res = next(cur)[0]
+    return int(res if res is not None else 0)
+
+
+def get_user_holidays_taken(user_id:int) -> int:
+    cnx = get_db()
+    cur = cnx.cursor(buffered=True)
+    cur.execute(("SELECT COUNT(id) AS holidays FROM kimai2_timesheet WHERE "
+                f"user = {user_id} AND activity_id = {HOLIDAY_STUDENT_ACTI_ID} "
+                f"AND exported = 1;"))
     res = next(cur)[0]
     return int(res if res is not None else 0)
 
