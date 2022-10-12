@@ -10,6 +10,7 @@ from datetime import datetime, date, timedelta
 dotenv.load_dotenv()
 
 ADMIN_USER_ID = 1
+HOLIDAY_FULLTIME_EMPLOYEE_HOURS = 24 * 8
 
 
 def get_console():
@@ -69,6 +70,7 @@ class Worker:
         mail, alias = db_util.get_user_mail_alias(id)
         self._mail = mail
         self._alias = alias
+        self._registration = db_util.get_user_registration_date(id)
         # lookup date_tz from sheet-tuple, last item
         self._weeks = db_util.sum_times_weeks(id, [ x[-1] for x in sheets ])
         # sheets are sorted ascending
@@ -76,6 +78,7 @@ class Worker:
         self._budget_month = db_util.get_worker_budget(id)
         self._last_changed_sheet = db_util.get_last_edited_sheet(id, sheets[0][-1])
         self._last_generated_change = db_util.get_generation_cycle_id_dt(id)
+        self._preferences = db_util.get_user_preferences(id)
 
     def mark_sheets_exported(self):
         db_util.set_sheets_exported([s[0] for s in self._sheets])
@@ -93,6 +96,20 @@ class Worker:
 
     def get_open_sheets(self, year, month):
         return db_util.get_open_sheets(self._id, year, month)
+
+    def get_work_days(self) -> int:
+        return int((datetime.now() - self._registration).total_seconds() / 86400)
+
+    def get_holiday_eligibility(self):
+        now = datetime.now()
+        employeed_days = int((now - self._registration).total_seconds() / 86400)
+        weeks = employeed_days / 7
+        total_hours = db_util.sum_times_range(self._id, self._registration, now) / 3600
+        average_weekly = total_hours / weeks
+        holiday_hours = HOLIDAY_FULLTIME_EMPLOYEE_HOURS * average_weekly / 40
+        holiday_days = holiday_hours / 8
+        holiday_taken = db_util.get_user_holidays_taken(self._id)
+        return average_weekly, holiday_days, holiday_taken
 
 
 class AutogenProjekt:
