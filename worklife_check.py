@@ -81,7 +81,7 @@ if __name__ == "__main__":
             alert = ""
             receiver = [email]
             msg = f"Hi {alias}!\n\n"
-        msg += "Here is your worktime report for the last 5 weeks.\nYour nominal worktime is set to {hpw:.1f} hours\n\n"
+        msg += f"Here is your worktime report for the last 5 weeks.\nYour nominal worktime is set to {hpw:.1f} hours\n\n"
         for dt, hr, ov in table:
             if ov:
                 msg += f"{dt}\n  {hr}h -> {ov} hours\n\n "
