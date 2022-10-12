@@ -140,7 +140,7 @@ def get_private_project_activity_for_user(user:int):
     team_id = next(cur)[0]
     cur.execute(f"SELECT project_id FROM kimai2_projects_teams WHERE team_id = {team_id};")
     proj_id = next(cur)[0]
-    cur.execute(f"SELECT project_id FROM kimai2_activities_teams WHERE team_id = {team_id};")
+    cur.execute(f"SELECT activity_id FROM kimai2_activities_teams WHERE team_id = {team_id};")
     acti_id = next(cur)[0]
     return proj_id, acti_id
 
@@ -279,15 +279,16 @@ def insert_timesheet(user_id:int, activity_id:int, project_id:int, start:datetim
     durs = int((end - start).total_seconds())
     durh = durs / 3600
     rate = hourly_rate * durh
+    description = description.replace("'", "_").replace("\"", "_")
     cnx = get_db()
     cur = cnx.cursor(buffered=True)
-    querry = "INSERT INTO kimai2_timesheet("
+    querry = ("INSERT INTO kimai2_timesheet("
     "id, user, activity_id, project_id, start_time, end_time, "
     "duration, description, rate, hourly_rate, exported, "
     "timezone, internal_rate, modified_at, date_tz) "
     f"VALUES (NULL, {user_id}, {activity_id}, {project_id}, '{start}', '{end}', "
     f"{durs}, '{description}', {rate}, {hourly_rate}, {int(exported)}, "
-    f"'{tz}', {rate}, '2022-07-01 00:00:00', '{datetz}');"
+    f"'{tz}', {rate}, '2022-07-01 00:00:00', '{datetz}');")
     cur.execute(querry)
     cnx.commit()
 
