@@ -72,7 +72,7 @@ if __name__ == "__main__":
     parser.add_argument("--inter", action="store_true", help="wether or not to run interactive expecting further inpunt default = not set")
 
     args = parser.parse_args()
-    args.userdata = ["fritz", "fratz", "fritz@web.de", "student"]
+    #args.userdata = ["fritz", "fratz", "fritz@web.de", "student"]
     if args.csvfile:
         print("Reading new users from csv file")
         fp = pathlib.Path(args.csvfile)
