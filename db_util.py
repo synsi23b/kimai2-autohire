@@ -103,6 +103,7 @@ def check_username_free(user:str):
         uid = get_user_id(user)
         return False
     except StopIteration:
+        get_db().close()
         return True
 
 
@@ -170,6 +171,31 @@ def create_private_team(team_name:str, leader_id:int, user_id:int) -> int:
     cur.execute(f"INSERT INTO kimai2_users_teams(user_id, team_id, teamlead) VALUES ({leader_id}, {team_id}, 1), ({user_id}, {team_id}, 0);")
     cnx.commit()
     return team_id
+
+
+def user_join_team(user_id:int, team_name:str):
+    cnx = get_db()
+    cur = cnx.cursor(buffered=True)
+    cur.execute(f"SELECT id FROM kimai2_teams WHERE name = '{team_name}';")
+    team_id = next(cur)[0]
+    cur.execute(f"INSERT INTO kimai2_users_teams(user_id, team_id, teamlead) VALUES ({user_id}, {team_id}, 0);")
+    cnx.commit()
+
+
+def create_user_preference(user_id:int, key:str, value):
+    if type(value) != str:
+        value = str(value)
+    cnx = get_db()
+    cur = cnx.cursor(buffered=True)
+    cur.execute(f"SELECT * FROM kimai2_user_preferences WHERE user_id = {user_id} AND name = '{key}';")
+    try:
+        next(cur)
+        # value already exists, update
+        #f"UPDATE kimai2_timesheet SET exported= 1 WHERE id={i};
+        cur.execute(f"UPDATE kimai2_user_preferences SET value = '{value}' WHERE user_id = {user_id} AND name = '{key}';")
+    except StopIteration:
+        cur.execute(f"INSERT INTO kimai2_user_preferences(user_id, name, value) VALUES ({user_id}, '{key}', '{value}');")
+    cnx.commit()
 
 
 def create_private_activity(proj_id:int, acti_name:str, team_id:int, salary:float, hours:float):

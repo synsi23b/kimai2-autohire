@@ -6,6 +6,7 @@ import re
 import urllib
 import yaml
 from datetime import datetime, date, timedelta
+from dataclasses import dataclass
 
 dotenv.load_dotenv()
 
@@ -13,11 +14,25 @@ ADMIN_USER_ID = 1
 HOLIDAY_FULLTIME_EMPLOYEE_HOURS = 24 * 8
 
 
+@dataclass(frozen=True)
+class UserType:
+    verbose: str
+    teams: list
+    roles: list
+
+
+USER_TYPES = {
+    "angestellter": UserType("Angestellter", ["LIT"], ["ROLE_USER", "Angestellter"]),
+    "student": UserType("Werkstudent", ["Werkstudent"], ["ROLE_USER", "Werkstudent"]),
+    "schueler": UserType("Angestellter", ["Schüleraushilfe"], ["ROLE_USER", "Werkstudent"]),
+}
+
+
 def get_console():
     """
     return path to console binary using standard if not overwritten by env
     """
-    path = getenv("KIMAI_BINARY_PATH")
+    path = getenv("KIMAI_CONSOLE_PATH")
     if path is None:
         return "/var/www/kimai2/bin/console"
     return path
@@ -36,7 +51,7 @@ def get_email_credentials():
     return (sender, passw, host, int(port))
 
 
-def console_user_create(user, passw, email):
+def console_user_create(user, passw, email, roles=["ROLE_USER"]):
     """
     Usage:
         kimai:user:create <username> <email> [<role> [<password>]]
@@ -49,19 +64,21 @@ def console_user_create(user, passw, email):
     password              Password for the new user (requested if not provided)
     """
     cons = get_console()
-    res = subprocess.run([cons, "--no-interaction", "kimai:user:create", user, email, "ROLE_USER", passw])
+    if len(roles) == 1:
+        res = subprocess.run([cons, "--no-interaction", "kimai:user:create", user, email, roles[0], passw])
+    else:
+        res = subprocess.run([cons, "--no-interaction", "kimai:user:create", user, email, ",".join(roles), passw])
     res.check_returncode()
     
 
-def create_activity(usertype:str, user:str, hours:float):
-    proj_id, custom_id = db_util.get_project_for_type(usertype)
-    salary = db_util.get_project_rate(proj_id)
-    user_id = db_util.get_user_id(user)
-    team_name = f"work_{user}"
-    team_id = db_util.create_private_team(team_name, ADMIN_USER_ID, user_id)
-    db_util.create_private_activity(proj_id, team_name, team_id, salary, hours)
-    db_util.link_team_proj_customer(team_id, proj_id, custom_id)
-
+# def create_activity(usertype:str, user:str, hours:float):
+#     proj_id, custom_id = db_util.get_project_for_type(usertype)
+#     salary = db_util.get_project_rate(proj_id)
+#     user_id = db_util.get_user_id(user)
+#     team_name = f"work_{user}"
+#     team_id = db_util.create_private_team(team_name, ADMIN_USER_ID, user_id)
+#     db_util.create_private_activity(proj_id, team_name, team_id, salary, hours)
+#     db_util.link_team_proj_customer(team_id, proj_id, custom_id)
 
 class Werkstudent:
     def __init__(self, row):

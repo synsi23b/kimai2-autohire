@@ -111,7 +111,7 @@ def html_link(text, dest):
     return f"<a href=\"{dest}\">{text}</a>\n"
 
 
-def make_onboarding_msg(first:str, last:str, type:str, monthly_hours:float, user:str, password:str) -> str:
+def make_onboarding_msg(first:str, last:str, type:str, user:str, password:str) -> str:
     msg = f"""
 Hallo {first} {last},
 
@@ -122,8 +122,9 @@ Die Arbeitszeiterfassung funktioniert bei uns digital über die Webseite:
 https://worktime.leap-in-time.de
 
 Um bezahlt zu werden, müssen Sie dort Ihre Arbeitszeiten korrekt angeben.
-Eine Anleitung wie das genau funktioniert und was dabei zu beachten ist finden Sie im Anhang,
-oder in der Dokumentation der Software: https://www.kimai.org/documentation/timesheet.html
+Eine Kurzanleitung wie das genau funktioniert und was dabei zu beachten ist finden Sie hier:
+
+https://wiki.leap-in-time.de/en/public/onboarding/worktime
 
 Ihre Login-Daten:
   Username: {user}
@@ -132,7 +133,7 @@ Ihre Login-Daten:
 Aus Sicherheitsgründen sollten Sie das Passwort ändern, können es aber auch einfach so weiterverwenden.
 Wenn Sie das Passwort vergessen haben, können Sie sich einen Wiederherstellungslink per E-Mail auf der Startseite zusenden lassen.
 
-Ihre Einteilung ist in der Gruppe {type} mit {monthly_hours} Stunden pro Monat.
+Ihre Einteilung ist in der Gruppe {type}.
 
 Viel Spass!
 
@@ -147,8 +148,9 @@ We use this website to record working hours digitally:
 https://worktime.leap-in-time.de
 
 In order to get paid you have to correctly submit your working hours there.
-You will find instructions on how this works and what you need to bear in mind in the attachment,
-or in the documentation of the software: https://www.kimai.org/documentation/timesheet.html
+You will find short instructions on how this works and what you need to bear in mind here:
+
+https://wiki.leap-in-time.de/en/public/onboarding/worktime
 
 Your login data:
   Username: {user}
@@ -157,7 +159,7 @@ Your login data:
 For security reasons you should change the password, but you can also continue to use it as it is.
 If you forget the password, you can have a recovery link sent to you by email on the home page.
 
-Your allocation is in the group {type} with {monthly_hours} hours per month.
+Your allocation is in the group {type}.
 
 Have fun!
 
