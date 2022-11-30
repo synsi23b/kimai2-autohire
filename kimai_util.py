@@ -7,6 +7,8 @@ import urllib
 import yaml
 from datetime import datetime, date, timedelta
 from dataclasses import dataclass
+import subprocess
+from pathlib import Path
 
 dotenv.load_dotenv()
 
@@ -28,7 +30,7 @@ USER_TYPES = {
 }
 
 
-def get_console():
+def get_console() -> str:
     """
     return path to console binary using standard if not overwritten by env
     """
@@ -36,6 +38,10 @@ def get_console():
     if path is None:
         return "/var/www/kimai2/bin/console"
     return path
+
+
+def get_kimai_datafolder() -> str:
+    return "/var/www/kimai2/var/data"
 
 
 def get_email_credentials():
@@ -242,16 +248,37 @@ def get_gen_projects():
     return [AutogenProjekt(*x) for x in db_util.get_generate_projects()]
 
 
+def export_invoice(user:str, start:date, end:date, template:str, outpath:str|Path) -> str:
+    #   Usage:
+    #   kimai:invoice:create [options]
+
+    #   Options:
+    #       --user=USER                      The user to be used for generating the invoices
+    #       --start[=START]                  Start date (format: 2020-01-01, default: start of the month)
+    #       --end[=END]                      End date (format: 2020-01-31, default: end of the month)
+    #       --timezone[=TIMEZONE]            Timezone for start and end date query (fallback: users timezone)
+    #       --customer[=CUSTOMER]            Comma separated list of customer IDs
+    #       --project[=PROJECT]              Comma separated list of project IDs
+    #       --by-customer                    If set, one invoice for each active customer in the given timerange is created
+    #       --by-project                     If set, one invoice for each active project in the given timerange is created
+    #       --set-exported                   Whether the invoice items should be marked as exported
+    #       --template[=TEMPLATE]            Invoice template
+    #       --template-meta[=TEMPLATE-META]  Fetch invoice template from a meta-field
+    #       --search[=SEARCH]                Search term to filter invoice entries
+    #       --exported[=EXPORTED]            Exported filter for invoice entries (possible values: exported, all), by default only "not exported" items are fetched
+    #       --preview[=PREVIEW]              Absolute path for a rendered preview of the invoice, which will neither be saved nor the items be marked as exported.
+    #       --preview-unique                 Adds a unique part to the filename of the generated invoice preview file, so there is no chance that they get overwritten on same project name.
+    #./bin/console kimai:invoice:create --user=presley85 --template=myinvoi --exported=all --by-customer
+    res = subprocess.run([get_console(), "kimai:invoice:create", f"--user={user}", f"--start={start.strftime('%Y-%m-%d')}", f"--end={end.strftime('%Y-%m-%d')}", f"--template={template}", f"--by-customer", "--exported=all", f"--preview={outpath}"], capture_output=True)
+    if res.returncode != 0:
+        raise RuntimeError(f"{res.stderr}\n\n{res.stdout}")
+    print(res.stdout)
+
+
+def export_monthly_journal_student(user:str, start:date, end:date, outpath:Path):
+    export_invoice(user, start, end, "journal_student", outpath)
+    
+
 if __name__ == "__main__":
     pass
-    #tup = get_email_credentials()
-    proj = get_gen_projects()[0]
-    wrk = proj.get_workers(2022, 8)[0]
-    for s in wrk._sheets:
-        print(s)
-    #week = proj.is_worker_weeks_ok(wrk)
-    #month = proj.is_worker_month_ok(wrk)
-
-    #print(week)
-
-    pass
+    students = db_util.get_user_by_role("Werk")

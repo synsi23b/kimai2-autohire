@@ -58,12 +58,15 @@ def get_db(override_dbname="") -> MySQLConnection:
         return cnx
 
 
-def get_user_by_role(role:str):
+def get_user_by_role(role:str, active=True):
     role = role.upper()
     cnx = get_db()
     cur = cnx.cursor(buffered=True)
-    cur.execute(f"SELECT * FROM kimai2_users WHERE INSTR(roles, '{role}');")
-    return cur
+    if active:
+        cur.execute(f"SELECT * FROM kimai2_users WHERE INSTR(roles, '{role}') AND enabled = 1;")
+    else:
+        cur.execute(f"SELECT * FROM kimai2_users WHERE INSTR(roles, '{role}');")
+    return list(cur)
 
 
 def set_user_alias(user:str, firstname:str, lastname:str):
