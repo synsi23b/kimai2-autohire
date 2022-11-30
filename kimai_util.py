@@ -9,8 +9,15 @@ from datetime import datetime, date, timedelta
 from dataclasses import dataclass
 import subprocess
 from pathlib import Path
+import logging
+import pytz
+
+
+UTC = pytz.timezone("UTC")
+
 
 dotenv.load_dotenv()
+
 
 ADMIN_USER_ID = 1
 HOLIDAY_FULLTIME_EMPLOYEE_HOURS = 24 * 8
@@ -86,8 +93,10 @@ def console_user_create(user, passw, email, roles=["ROLE_USER"]):
 #     db_util.create_private_activity(proj_id, team_name, team_id, salary, hours)
 #     db_util.link_team_proj_customer(team_id, proj_id, custom_id)
 
-class Werkstudent:
-    def __init__(self, row):
+
+class Angestellter:
+    def __init__(self, row, role):
+        self._role = role
         self._id = row[0]
         self._user = row[1]
         self._email = row[2]
@@ -95,11 +104,18 @@ class Werkstudent:
         self._registration = row[6]
         self._preferences = db_util.get_user_preferences(self._id)
 
-    @staticmethod
-    def get_all_active():
-        return [Werkstudent(row) for row in db_util.get_user_by_role("WERKSTUDENT")]
 
-    def get_holiday_eligibility(self):
+    @staticmethod
+    def get_all_active(role:str):
+        """
+        role: WERKSTUDENT ANGESTELLTER
+        """
+        return [Angestellter(row, role) for row in db_util.get_user_by_role(role)]
+
+
+    def get_student_holiday_eligibility(self):
+        if self._role != "WERKSTUDENT":
+            raise ValueError("Only supposed to be used for studenten!")
         now = datetime.now()
         employeed_days = int((now - self._registration).total_seconds() / 86400)
         weeks = employeed_days / 7
@@ -109,6 +125,31 @@ class Werkstudent:
         holiday_days = holiday_hours / 8
         holiday_taken = db_util.get_user_holidays_taken(self._id)
         return average_weekly, holiday_days, holiday_taken
+
+    
+    def import_holiday_on_day(self, holiday:tuple, holdidayconfig:dict):
+        """
+        holiday -> (date, name, state)
+        """
+        holidate, holiname, holistate = holiday
+        # check holiday applies for this users state
+        if holistate != self._preferences["public_holiday_state"]:
+            return
+        # check holiday doesnt exist already
+        holitivity = holdidayconfig["vacation.public_holiday_activity"]
+        if db_util.check_timesheet_exists(self._id, holidate, holitivity, holiname):
+            logging.info(f"User: {self._user} has holiday {holiname} already set, skipping")
+            return
+        # check user is actualy supposed to work on this day
+        # TODO wether or not students will get a time here. maybe always zero hours is best
+        workingtime = int(self._preferences[holdidayconfig[f"holiday_{holidate.weekday()}"]])
+        #if workingtime == 0: # dont check, insert even 0 duration holidays just for display on the journal
+        #    return
+        # create start, end, duration
+        start = datetime(holidate.year, holidate.month, holidate.day, 8, tzinfo=UTC)
+        end = start + timedelta(seconds=workingtime)
+        # finaly insert new timesheet
+        db_util.insert_timesheet(self._id, holitivity, 0, start, end, holiname, 0, True)
 
 
 class Worker:

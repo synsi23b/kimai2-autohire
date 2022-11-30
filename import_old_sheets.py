@@ -91,7 +91,7 @@ def create_sheets(user:str, sheets:list):
     rate = get_project_rate(proj)
     exported = True
     for start, end, filename, description in sheets:
-        insert_timesheet(user_id, acti, proj, start, end, description, exported, rate)
+        insert_timesheet(user_id, acti, proj, start, end, description, rate, exported, "Europe/Berlin")
 
 
 if __name__ == "__main__":

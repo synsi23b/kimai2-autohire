@@ -308,15 +308,26 @@ def get_open_sheets(user_id:int, year:int, month:int) -> list:
     return list(cur)
 
 
-def insert_timesheet(user_id:int, activity_id:int, project_id:int, start:datetime, end:datetime, description:str, exported:bool, hourly_rate:float):
-    tz = "Europe/Berlin"
+def get_project_by_activity(activity_id):
+    cnx = get_db()
+    cur = cnx.cursor(buffered=True)
+    cur.execute(f"SELECT project_id FROM kimai2_activities WHERE id = {activity_id};")
+    return next(cur)[0]
+
+
+def insert_timesheet(user_id:int, activity_id:int, project_id:int, start:datetime, end:datetime, description:str, hourly_rate:float, exported:bool):
     datetz = start.date()
+    timezone = start.tzinfo.tzname(start)
     start = start.astimezone(UTC)
     end = end.astimezone(UTC)
     durs = int((end - start).total_seconds())
     durh = durs / 3600
     rate = hourly_rate * durh
     description = description.replace("'", "_").replace("\"", "_")
+    if project_id == 0:
+        project_id = get_project_by_activity(activity_id)
+        if not project_id:
+            raise RuntimeError(f"Timesheet creation failed: Could not find project id for activity {activity_id}")
     cnx = get_db()
     cur = cnx.cursor(buffered=True)
     querry = ("INSERT INTO kimai2_timesheet("
@@ -325,10 +336,38 @@ def insert_timesheet(user_id:int, activity_id:int, project_id:int, start:datetim
     "timezone, internal_rate, modified_at, date_tz) "
     f"VALUES (NULL, {user_id}, {activity_id}, {project_id}, '{start}', '{end}', "
     f"{durs}, '{description}', {rate}, {hourly_rate}, {int(exported)}, "
-    f"'{tz}', {rate}, '2022-07-01 00:00:00', '{datetz}');")
+    f"'{timezone}', {rate}, '{datetime.utcnow()}', '{datetz}');")
     cur.execute(querry)
     cnx.commit()
 
+
+def check_timesheet_exists(user_id:int, date_tz:date, activity_id:int, description:str=""):
+    cnx = get_db()
+    cur = cnx.cursor(buffered=True)
+    if description:
+        cur.execute(f"SELECT COUNT(id) from kimai2_timesheet WHERE user = {user_id} AND activity_id = {activity_id} AND date_tz = '{date_tz}' AND description LIKE '%{description}%';")
+    else:
+        cur.execute(f"SELECT COUNT(id) from kimai2_timesheet WHERE user = {user_id} AND activity_id = {activity_id} AND date_tz = '{date_tz}';")
+    return next(cur)[0]
+
+
+def get_holidays(start:date, end:date):
+    cnx = get_db()
+    cur = cnx.cursor()
+    cur.execute(f"SELECT holiday_date, name, state FROM kimai2_ext_public_holidays WHERE holiday_date between '{start}' AND '{end}';")
+    return list(cur)
+
+
+def get_configuration(key:str, key_exact=True):
+    cnx = get_db()
+    cur = cnx.cursor()
+    if key_exact:
+        cur.execute(f"SELECT value FROM kimai2_configuration WHERE name = '{key}';")
+        return next(cur)[0]
+    else:
+        cur.execute(f"SELECT name, value FROM kimai2_configuration WHERE name LIKE '%{key}%';")
+        return dict(list(cur))
+    
 
 def get_generation_cycle_id_dt(user_id:int):
     cnx = get_db("dbautohire")
