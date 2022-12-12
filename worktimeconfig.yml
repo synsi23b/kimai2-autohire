@@ -1,0 +1,18 @@
+ANGESTELLTER:
+    project: 1
+    regular: 1
+    breaktime: 25
+    noshow: 24
+    freeday: 23
+WERKSTUDENT:
+    project: 9
+    regular: 20
+    breaktime: 25
+    noshow: 24
+    freeday: 23
+SCHUELERAUSHILFE:
+    project: 4
+    regular: 21
+    breaktime: 25
+    noshow: 24
+    freeday: 23

@@ -308,6 +308,15 @@ def get_open_sheets(user_id:int, year:int, month:int) -> list:
     return list(cur)
 
 
+def get_open_overrun_sheets(user_id:int):
+    overrun_start_time = int(get_configuration("timesheet.rules.long_running_duration")) * 60 - 1
+    overrun_start_time = datetime.utcnow() - timedelta(seconds=overrun_start_time)
+    cnx = get_db()
+    cur = cnx.cursor(buffered=True)
+    cur.execute(f"SELECT id, start_time, timezone FROM kimai2_timesheet WHERE user = {user_id} AND start_time < {overrun_start_time} AND end_time IS NULL;")
+    return list(cur)
+
+
 def get_project_by_activity(activity_id):
     cnx = get_db()
     cur = cnx.cursor(buffered=True)
@@ -341,20 +350,25 @@ def insert_timesheet(user_id:int, activity_id:int, project_id:int, start:datetim
     cnx.commit()
 
 
-def check_timesheet_exists(user_id:int, date_tz:date, activity_id:int, description:str=""):
+def check_timesheet_exists(user_id:int, date_tz:date, activity_id:int=0, description:str=""):
     cnx = get_db()
     cur = cnx.cursor(buffered=True)
-    if description:
-        cur.execute(f"SELECT COUNT(id) from kimai2_timesheet WHERE user = {user_id} AND activity_id = {activity_id} AND date_tz = '{date_tz}' AND description LIKE '%{description}%';")
-    else:
+    if activity_id == 0:
+        cur.execute(f"SELECT COUNT(id) from kimai2_timesheet WHERE user = {user_id} AND date_tz = '{date_tz}';")
+    elif description == "":
         cur.execute(f"SELECT COUNT(id) from kimai2_timesheet WHERE user = {user_id} AND activity_id = {activity_id} AND date_tz = '{date_tz}';")
+    else:
+        cur.execute(f"SELECT COUNT(id) from kimai2_timesheet WHERE user = {user_id} AND activity_id = {activity_id} AND date_tz = '{date_tz}' AND description LIKE '%{description}%';")
     return next(cur)[0]
 
 
-def get_holidays(start:date, end:date):
+def get_holidays(start:date, end:date, state = ""):
     cnx = get_db()
     cur = cnx.cursor()
-    cur.execute(f"SELECT holiday_date, name, state FROM kimai2_ext_public_holidays WHERE holiday_date between '{start}' AND '{end}';")
+    if state == "":
+        cur.execute(f"SELECT holiday_date, name, state FROM kimai2_ext_public_holidays WHERE holiday_date between '{start}' AND '{end}';")
+    else:
+        cur.execute(f"SELECT holiday_date, name, state FROM kimai2_ext_public_holidays WHERE holiday_date between '{start}' AND '{end}' AND state = '{state}';")
     return list(cur)
 
 

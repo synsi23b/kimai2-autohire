@@ -19,7 +19,7 @@ UTC = pytz.timezone("UTC")
 dotenv.load_dotenv()
 
 
-ADMIN_USER_ID = 1
+#ADMIN_USER_ID = 1
 HOLIDAY_FULLTIME_EMPLOYEE_HOURS = 24 * 8
 
 
@@ -94,7 +94,15 @@ def console_user_create(user, passw, email, roles=["ROLE_USER"]):
 #     db_util.link_team_proj_customer(team_id, proj_id, custom_id)
 
 
+WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+
+
 class Angestellter:
+    # dictionary containing kimai configuration values regarding holdiay plugins
+    __vacationconfig = None
+    # dictionary containing kimai configuration values regarding default working activities per role
+    __workingconfig = None
+
     def __init__(self, row, role):
         self._role = role
         self._id = row[0]
@@ -103,13 +111,24 @@ class Angestellter:
         self._alias = row[4]
         self._registration = row[6]
         self._preferences = db_util.get_user_preferences(self._id)
+        self._worktime_weekdays = [int(self._preferences[Angestellter.__vacationconfig[f"worktime_{idx}"]]) for idx in range(7)]
 
+
+    @staticmethod
+    def populate_configuration():
+        if not Angestellter.__vacationconfig:
+            Angestellter.__vacationconfig = db_util.get_configuration("vacation", False)
+            for idx, day in enumerate(WEEKDAYS):
+                Angestellter.__vacationconfig[f"worktime_{idx}"] = Angestellter.__vacationconfig[f"vacation.daily_working_time_meta_name_{day}"]
+            Angestellter.__workingconfig = yaml.load(db_util.get_configuration("worktime.fillercfg", True), yaml.Loader)
+            
 
     @staticmethod
     def get_all_active(role:str):
         """
         role: WERKSTUDENT ANGESTELLTER
         """
+        Angestellter.populate_configuration()
         return [Angestellter(row, role) for row in db_util.get_user_by_role(role)]
 
 
@@ -127,7 +146,7 @@ class Angestellter:
         return average_weekly, holiday_days, holiday_taken
 
     
-    def import_holiday_on_day(self, holiday:tuple, holdidayconfig:dict):
+    def import_holiday_on_day(self, holiday:tuple):
         """
         holiday -> (date, name, state)
         """
@@ -136,20 +155,82 @@ class Angestellter:
         if holistate != self._preferences["public_holiday_state"]:
             return
         # check holiday doesnt exist already
-        holitivity = holdidayconfig["vacation.public_holiday_activity"]
+        holitivity = Angestellter.__vacationconfig["vacation.public_holiday_activity"]
         if db_util.check_timesheet_exists(self._id, holidate, holitivity, holiname):
             logging.info(f"User: {self._user} has holiday {holiname} already set, skipping")
             return
         # check user is actualy supposed to work on this day
         # TODO wether or not students will get a time here. maybe always zero hours is best
-        workingtime = int(self._preferences[holdidayconfig[f"holiday_{holidate.weekday()}"]])
+        workingtime = self._worktime_weekdays[holidate.weekday()]
         #if workingtime == 0: # dont check, insert even 0 duration holidays just for display on the journal
         #    return
         # create start, end, duration
-        start = datetime(holidate.year, holidate.month, holidate.day, 8, tzinfo=UTC)
+        start = UTC.localize(datetime(holidate.year, holidate.month, holidate.day, 8))
         end = start + timedelta(seconds=workingtime)
         # finaly insert new timesheet
+        logging.info(f"Inserting public holiday > {holiday} < for user {self._email}")
         db_util.insert_timesheet(self._id, holitivity, 0, start, end, holiname, 0, True)
+
+    
+    def has_not_worked(self, workday:date):
+        return db_util.check_timesheet_exists(self._id, workday) == 0
+
+
+    def fill_missing_workday(self, workday:date):
+        if self.has_not_worked(workday):
+            no_show_acti = Angestellter.__workingconfig[self._role]["noshow"]
+            filler_acti = Angestellter.__workingconfig[self._role]["freeday"]
+            default_proj = Angestellter.__workingconfig[self._role]["project"]
+            dt = datetime(workday.year, workday.month, workday.day)
+            start = end = pytz.timezone(self._preferences["timezone"]).localize(dt)
+            if self._worktime_weekdays[workday.weekday()] > 0:
+                logging.info(f"Insert missing day for user {self._email}")
+                db_util.insert_timesheet(self._id, no_show_acti, default_proj, start, end, "", 0, False)
+            else:
+                logging.info(f"Insert free day for user {self._email}")
+                db_util.insert_timesheet(self._id, filler_acti, default_proj, start, end, "", 0, False)
+
+
+    def _float_to_dt(self, day, value):
+        hours = int(value)
+        minutes = int(60*(value - hours))
+        dt = datetime(day.year, day.month, day.day, hours, minutes)
+        return pytz.timezone(self._preferences["timezone"]).localize(dt)
+
+    
+    def sum_weekly_time(self, day:date):
+        return db_util.sum_times_weeks(self._id, [day])[0][2]
+
+
+    def get_registration_date(self):
+        return self._registration.date()
+
+    
+    def receive_admin_mails(self):
+        return self._preferences.get("receive_administrativ_mails", 0)
+    
+
+    def insert_auto_worktime(self, workday:date):
+        # check not worked already that day (this also finds public holidays)
+        # make sure its also not the weekend (day 5 or 6)
+        if self.has_not_worked(workday) and workday.weekday() not in [5, 6]:
+            # compare to the maximum allowed weekly worktime of the fellow
+            week_max = int(self._preferences.get("worktime_auto_insert_weekly_max", 0))
+            if week_max == 0:
+                return
+            week_cur = self.sum_weekly_time(workday)
+            week_remaining_time = week_max - week_cur
+            if week_remaining_time > 0:
+                # if there is any time left to insert this week, do the daily maximum or remaining limit
+                insertseconds = min(week_remaining_time, int(self._preferences["worktime_auto_insert_daily_max"]))
+                start = self._float_to_dt(workday, float(self._preferences["worktime_auto_insert_start_time"]))
+                end = start + timedelta(seconds=insertseconds)
+                default_work = Angestellter.__workingconfig[self._role]["regular"]
+                default_proj = Angestellter.__workingconfig[self._role]["project"]
+                logging.info(f"Autowork: Inserting {insertseconds} seconds autowork for user {self._email}")
+                db_util.insert_timesheet(self._id, default_work, default_proj, start, end, "", 0, False)
+            else:
+                logging.info(f"Autowork: user {self._email} has filled weekly quota. Doing nothing")
 
 
 class Worker:
