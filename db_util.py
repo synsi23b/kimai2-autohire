@@ -9,7 +9,7 @@ import pytz
 from dataclasses import dataclass
 
 
-UTC = pytz.timezone("UTC")
+UTC = pytz.UTC
 
 
 HOLIDAY_STUDENT_ACTI_ID = 11
@@ -267,9 +267,9 @@ class Timesheet:
 
     def tzaware_start_end(self):
         tz = pytz.timezone(self.timezone)
-        s = pytz.utc.localize(self.start)
-        e = pytz.utc.localize(self.end)
-        return tz.localize(s), tz.localize(e)
+        s = UTC.localize(self.start)
+        e = UTC.localize(self.end)
+        return s.astimezone(tz), e.astimezone(tz)
 
 
 def select_timesheets(where:str, order:str=""):
@@ -380,7 +380,10 @@ def stop_open_sheets(user_id:int, day:date) -> bool:
             dsc =  f"!! Automatisch gestoppt !!\n{sheet.description}"
         else:
             dsc = "!! Automatisch gestoppt !!"
-        update_timesheet_times_description(sheet, UTC.localize(sheet.start), datetime.utcnow(), dsc)
+        usertz = pytz.timezone(sheet.timezone)
+        start = UTC.localize(sheet.start).astimezone(usertz)
+        end = datetime.utcnow().astimezone(usertz)
+        update_timesheet_times_description(sheet, start, end, dsc)
     return stopped
 
 
@@ -402,6 +405,8 @@ def is_activity_deduction(activity_id):
 def insert_timesheet(user_id:int, activity_id:int, project_id:int, start:datetime, end:datetime, description:str, hourly_rate:float, exported:bool):
     datetz = start.date()
     timezone = str(start.tzinfo)
+    if start.tzinfo is None:
+        raise ValueError("Naive datetime object are not supported. This needs propper timezone setting")
     start = start.astimezone(UTC)
     end = end.astimezone(UTC)
     durs = int((end - start).total_seconds())
@@ -430,6 +435,8 @@ def insert_timesheet(user_id:int, activity_id:int, project_id:int, start:datetim
 def update_timesheet_times_description(timesheet:Timesheet, start:datetime, end:datetime, description):
     datetz = start.date()
     timezone = str(start.tzinfo)
+    if start.tzinfo is None:
+        raise ValueError("Naive datetime object are not supported. This needs propper timezone setting")
     start = start.astimezone(UTC)
     end = end.astimezone(UTC)
     durs = int((end - start).total_seconds())
@@ -446,7 +453,7 @@ def update_timesheet_times_description(timesheet:Timesheet, start:datetime, end:
     cur = cnx.cursor(buffered=True)
     querry = ("UPDATE kimai2_timesheet "
     f"SET start_time = '{start}', end_time = '{end}', duration = {durs}, description = '{description}', "
-    f"rate = {rate}, timezone = '{timezone}', modified_at = '{datetime.utcnow()}', date_tz = '{datetz}' "
+    f"rate = {rate}, hourly_rate = {hourlyr}, timezone = '{timezone}', modified_at = '{datetime.utcnow()}', date_tz = '{datetz}' "
     f"WHERE id = {timesheet.id};")
     cur.execute(querry)
     cnx.commit()
