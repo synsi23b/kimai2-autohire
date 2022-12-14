@@ -6,6 +6,7 @@ from pathlib import Path
 from datetime import datetime, date, timedelta
 import calendar
 import pytz
+from dataclasses import dataclass
 
 
 UTC = pytz.timezone("UTC")
@@ -242,7 +243,71 @@ def sum_times_range(user_id:int, start, end) -> float:
     return int(res if res is not None else 0)
 
 
-def get_user_holidays_taken(user_id:int) -> int:
+@dataclass
+class Timesheet:
+    id: int
+    user: int
+    activity: int
+    project: int
+    start: datetime
+    end: datetime
+    duration: int
+    description: str
+    rate: float
+    fixed_rate: float
+    hourly_rate: float
+    exported: bool
+    timezone: str
+    internal_rate: float
+    billable: bool
+    category: str
+    modified_at: datetime
+    date_tz: date
+
+
+    def tzaware_start_end(self):
+        tz = pytz.timezone(self.timezone)
+        s = pytz.utc.localize(self.start)
+        e = pytz.utc.localize(self.end)
+        return tz.localize(s), tz.localize(e)
+
+
+def select_timesheets(where:str, order:str=""):
+    """
+    order can take the default value (no order)
+    or the statement like start_time ASC
+    """
+    cnx = get_db()
+    cur = cnx.cursor(buffered=True)
+    if order == "":
+        cur.execute(f"SELECT * FROM kimai2_timesheet WHERE {where};")
+    else:
+        cur.execute(f"SELECT * FROM kimai2_timesheet WHERE {where} ORDER BY {order};")
+    return [Timesheet(*x) for x in cur]
+
+
+def get_sheets_for_day(user_id:int, day:date, activities:list[int]) -> list[Timesheet]:
+    return select_timesheets(f"user = {user_id} AND date_tz = '{day}' AND end_time IS NOT NULL and activity_id IN ({','.join(activities)})", "start_time ASC")
+
+
+def calculate_timesheet_break_times(sheets:list[Timesheet]) ->  int:
+    """
+    calculate break times taken between timesheets according to german law -> A break has a minimum of 15 minutes, else its not a break
+    """
+    pause = 0
+    if len(sheets) > 1:
+        pairs = zip(sheets, sheets[1:] + [None])
+        for a, b in pairs:
+            if b is not None:
+                _, a_end = a.tzaware_start_end()
+                b_start, _ = b.tzaware_start_end()
+                interval = (b_start - a_end).total_seconds()
+                if interval >= (15 * 60):
+                    pause += interval
+    return pause    
+
+
+def get_student_holidays_taken(user_id:int) -> int:
     cnx = get_db()
     cur = cnx.cursor(buffered=True)
     cur.execute(("SELECT COUNT(id) AS holidays FROM kimai2_timesheet WHERE "
@@ -263,10 +328,7 @@ def get_sheets_for_project(proj_id, year:int, month:int) -> list:
     start = date(year, month, 1)
     # monthrange returns a tuple (day_of_week, last_day_of_month)
     end = date(year, month, calendar.monthrange(year, month)[1])
-    cnx = get_db()
-    cur = cnx.cursor(buffered=True)
-    cur.execute(f"SELECT * FROM kimai2_timesheet WHERE project_id = {proj_id} AND end_time IS NOT NULL AND date_tz between '{start}' AND '{end}' ORDER BY start_time ASC;")
-    return list(cur)
+    return select_timesheets(f"project_id = {proj_id} AND end_time IS NOT NULL AND date_tz between '{start}' AND '{end}'", "start_time ASC")
 
 
 def get_team_worker_by_project(proj_id:int) -> list:
@@ -308,13 +370,18 @@ def get_open_sheets(user_id:int, year:int, month:int) -> list:
     return list(cur)
 
 
-def get_open_overrun_sheets(user_id:int):
-    overrun_start_time = int(get_configuration("timesheet.rules.long_running_duration")) * 60 - 1
-    overrun_start_time = datetime.utcnow() - timedelta(seconds=overrun_start_time)
-    cnx = get_db()
-    cur = cnx.cursor(buffered=True)
-    cur.execute(f"SELECT id, start_time, timezone FROM kimai2_timesheet WHERE user = {user_id} AND start_time < {overrun_start_time} AND end_time IS NULL;")
-    return list(cur)
+def stop_open_sheets(user_id:int, day:date) -> bool:
+    #overrun_start_time = int(get_configuration("timesheet.rules.long_running_duration")) * 60 - 1
+    #overrun_start_time = datetime.utcnow() - timedelta(seconds=overrun_start_time)
+    stopped = False
+    for sheet in select_timesheets(f"user = {user_id} AND end_time IS NULL AND date_tz = '{day}';"):
+        stopped = True
+        if sheet.description:
+            dsc =  f"!! Automatisch gestoppt !!\n{sheet.description}"
+        else:
+            dsc = "!! Automatisch gestoppt !!"
+        update_timesheet_times_description(sheet, UTC.localize(sheet.start), datetime.utcnow(), dsc)
+    return stopped
 
 
 def get_project_by_activity(activity_id):
@@ -324,12 +391,22 @@ def get_project_by_activity(activity_id):
     return next(cur)[0]
 
 
+def is_activity_deduction(activity_id):
+    cnx = get_db()
+    cur = cnx.cursor(buffered=True)
+    cur.execute(f"SELECT value FROM kimai2_activities_meta WHERE activity_id = {activity_id} AND name ='is_deduction';")
+    res = list(cur)
+    return res[0] if res else 0
+
+
 def insert_timesheet(user_id:int, activity_id:int, project_id:int, start:datetime, end:datetime, description:str, hourly_rate:float, exported:bool):
     datetz = start.date()
-    timezone = start.tzinfo.tzname(start)
+    timezone = str(start.tzinfo)
     start = start.astimezone(UTC)
     end = end.astimezone(UTC)
     durs = int((end - start).total_seconds())
+    if is_activity_deduction(activity_id):
+        durs = -durs
     durh = durs / 3600
     rate = hourly_rate * durh
     description = description.replace("'", "_").replace("\"", "_")
@@ -347,6 +424,38 @@ def insert_timesheet(user_id:int, activity_id:int, project_id:int, start:datetim
     f"{durs}, '{description}', {rate}, {hourly_rate}, {int(exported)}, "
     f"'{timezone}', {rate}, '{datetime.utcnow()}', '{datetz}');")
     cur.execute(querry)
+    cnx.commit()
+
+
+def update_timesheet_times_description(timesheet:Timesheet, start:datetime, end:datetime, description):
+    datetz = start.date()
+    timezone = str(start.tzinfo)
+    start = start.astimezone(UTC)
+    end = end.astimezone(UTC)
+    durs = int((end - start).total_seconds())
+    if is_activity_deduction(timesheet.activity):
+        durs = -durs
+    durh = durs / 3600
+    if timesheet.hourly_rate:
+        hourlyr = timesheet.hourly_rate
+    else:
+        hourlyr = 0.0
+    rate = hourlyr * durh
+    description = description.replace("'", "_").replace("\"", "_")
+    cnx = get_db()
+    cur = cnx.cursor(buffered=True)
+    querry = ("UPDATE kimai2_timesheet "
+    f"SET start_time = '{start}', end_time = '{end}', duration = {durs}, description = '{description}', "
+    f"rate = {rate}, timezone = '{timezone}', modified_at = '{datetime.utcnow()}', date_tz = '{datetz}' "
+    f"WHERE id = {timesheet.id};")
+    cur.execute(querry)
+    cnx.commit()
+
+
+def timesheet_delete(timesheet_id:int):
+    cnx = get_db()
+    cur = cnx.cursor(buffered=True)
+    cur.execute(f"DELETE FROM kimai2_timesheet WHERE id = {timesheet_id};")
     cnx.commit()
 
 

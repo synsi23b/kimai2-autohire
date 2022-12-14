@@ -112,6 +112,12 @@ class Angestellter:
         self._registration = row[6]
         self._preferences = db_util.get_user_preferences(self._id)
         self._worktime_weekdays = [int(self._preferences[Angestellter.__vacationconfig[f"worktime_{idx}"]]) for idx in range(7)]
+        if role != "ROLE_ADMIN":
+            self._work_actis = Angestellter.__workingconfig[self._role]["work"]
+            self._project = Angestellter.__workingconfig[self._role]["project"]
+            self._break_acti = Angestellter.__workingconfig[self._role]["breaktime"]
+            self._freeday_acti = Angestellter.__workingconfig[self._role]["freeday"]
+            self._noshow_acti = Angestellter.__workingconfig[self._role]["noshow"]
 
 
     @staticmethod
@@ -178,28 +184,26 @@ class Angestellter:
 
     def fill_missing_workday(self, workday:date):
         if self.has_not_worked(workday):
-            no_show_acti = Angestellter.__workingconfig[self._role]["noshow"]
-            filler_acti = Angestellter.__workingconfig[self._role]["freeday"]
-            default_proj = Angestellter.__workingconfig[self._role]["project"]
             dt = datetime(workday.year, workday.month, workday.day)
             start = end = pytz.timezone(self._preferences["timezone"]).localize(dt)
             if self._worktime_weekdays[workday.weekday()] > 0:
                 logging.info(f"Insert missing day for user {self._email}")
-                db_util.insert_timesheet(self._id, no_show_acti, default_proj, start, end, "", 0, False)
+                db_util.insert_timesheet(self._id, self._noshow_acti, self._project, start, end, "", 0, False)
             else:
                 logging.info(f"Insert free day for user {self._email}")
-                db_util.insert_timesheet(self._id, filler_acti, default_proj, start, end, "", 0, False)
+                db_util.insert_timesheet(self._id, self._freeday_acti, self._project, start, end, "", 0, False)
 
 
     def _float_to_dt(self, day, value):
         hours = int(value)
         minutes = int(60*(value - hours))
         dt = datetime(day.year, day.month, day.day, hours, minutes)
+        #userdt = pytz.timezone(self._preferences["timezone"]).localize(dt)
         return pytz.timezone(self._preferences["timezone"]).localize(dt)
 
     
     def sum_weekly_time(self, day:date):
-        return db_util.sum_times_weeks(self._id, [day])[0][2]
+        return db_util.sum_times_weeks(self._id, [day], )[0][2]
 
 
     def get_registration_date(self):
@@ -225,12 +229,56 @@ class Angestellter:
                 insertseconds = min(week_remaining_time, int(self._preferences["worktime_auto_insert_daily_max"]))
                 start = self._float_to_dt(workday, float(self._preferences["worktime_auto_insert_start_time"]))
                 end = start + timedelta(seconds=insertseconds)
-                default_work = Angestellter.__workingconfig[self._role]["regular"]
+                default_work = Angestellter.__workingconfig[self._role]["work"][0]
                 default_proj = Angestellter.__workingconfig[self._role]["project"]
                 logging.info(f"Autowork: Inserting {insertseconds} seconds autowork for user {self._email}")
-                db_util.insert_timesheet(self._id, default_work, default_proj, start, end, "", 0, False)
+                db_util.insert_timesheet(self._id, self._work_actis[0], self._project, start, end, "", 0, False)
             else:
                 logging.info(f"Autowork: user {self._email} has filled weekly quota. Doing nothing")
+
+    
+    def insert_breaktime(self, day):
+        # check the total worktime is greater than 6 or 8 hours
+        # between 6 and 8 hours, 30 minutes break are neccessairy
+        # over 8 hours 1 hour break is neccessairy
+        # also calculate the times between individual sheets, if there is a break over 15 minutes, count it towards the forced break time
+        sheets = db_util.get_sheets_for_day(self._id, day, self._work_actis)
+        total_duration = sum([ts.duration for ts in sheets])
+        remaining_time = 0
+        if total_duration > (8 * 60 * 60):
+            # work over 8:00 hours -> minimum break time 3600s (1h)
+            break_times = db_util.calculate_timesheet_break_times(sheets)
+            remaining_time = 3600 - break_times
+        elif total_duration > (6 * 60 * 60):
+            # work between 6:01 and 8:00 hours -> minimum break time 1800s (30min)
+            break_times = db_util.calculate_timesheet_break_times(sheets)
+            remaining_time = 1800 - break_times
+        # get breaksheet if it already exists to update instead of insert
+        breaksheet = db_util.get_sheets_for_day(self._id, day, [self._break_acti])[0]
+        if remaining_time > 0:
+            # have to insert a break of remaining_time seconds
+            if breaksheet and breaksheet.duration == -remaining_time:
+                # the current break time is the same as the exisiting one
+                return
+            # always use UTC 0 hour as start
+            # _, break_start = sheets[-1].tzaware_start_end()
+            # if break_start.date() != day:
+            #     # if appending the break at the end of the working time, make sure it is still the same day
+            #     # since it is not possible in this case, append the time at the start of the day
+            #     break_start = datetime(day.year, day.month, day.day, tzinfo=UTC)
+            break_start = datetime(day.year, day.month, day.day, tzinfo=UTC)
+            break_end = break_start + timedelta(seconds=remaining_time)
+            breakinfo = f"{datetime.utcnow()}: Gearbeitet: {total_duration/3600} Freiwillige Pausen: {break_times/3600}"
+            if breaksheet:
+                logging.info(f"Updating mandatory break for user {self._email}: {remaining_time} seconds. Worked {total_duration} and took {break_times} break by sign out")
+                db_util.update_timesheet_times_description(breaksheet, break_start, break_end, f"{breaksheet.description}\n{breakinfo}")
+            else:
+                logging.info(f"Inserting mandatory break for user {self._email}: {remaining_time} seconds. Worked {total_duration} and took {break_times} break by sign out")
+                db_util.insert_timesheet(self._id, self._break_acti, self._project, break_start, break_end, breakinfo, 0, True)
+        else:
+            # dont have to insert a break, check if the breaksheet exists, than delete it
+            if breaksheet:
+                db_util.timesheet_delete(breaksheet.id)
 
 
 class Worker:
