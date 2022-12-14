@@ -50,7 +50,6 @@ def stop_overnight_timesheets(employees:list[Angestellter], day:date):
 
 def run_corrections_for_yesterday():
     day = (datetime.utcnow() - timedelta(days=1)).date()
-    day = date(2022, 12, 14)
     logging.info(f"Running nightly corrections {day}")
     empl = Angestellter.get_all_active("ANGESTELLTER")
     stud = Angestellter.get_all_active("WERKSTUDENT")
