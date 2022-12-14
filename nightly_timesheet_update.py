@@ -30,7 +30,7 @@ def insert_breaktimes(employees:list[Angestellter], day:date):
         ma.insert_breaktime(day)
 
 
-def stop_morning_timesheets(employees:list[Angestellter], day:date):
+def stop_overnight_timesheets(employees:list[Angestellter], day:date):
     mail_queue = []
     for ma in employees:
         if db_util.stop_open_sheets(ma._id, day):
@@ -40,23 +40,24 @@ def stop_morning_timesheets(employees:list[Angestellter], day:date):
         # create mail message and send to admins
         admins_mails = [x._email for x in Angestellter.get_all_active("ROLE_ADMIN") if x.receive_admin_mails()]
         for ma in mail_queue:
-            msg = f"Guten morgen!\n\nHeute morgen wurde ein Timesheet von\n\n{ma._alias}\n\nautomatisch gestoppt."
+            msg = f"Guten morgen!\n\nHeute morgen wurde ein Timesheet von\n\n{ma._alias}\n\nautomatisch gestoppt.\nHier ein Admin-link zu allen Autostop Zeiten: https://worktime.leap-in-time.de/de/team/timesheet/?tags=Autostop \n\nBeim korrigieren das Schlagwort >Autostop< am besten entfernen, dann verschwindet der Eintrag auch aus dieser Zussammenfassung."
             if ma._email in admins_mails:
                 recv = admins_mails
             else:
                 recv = admins_mails + [ma._email]
-            send_mail(admins_mails, "Automatisch gestopptes Timesheet", msg)
+            send_mail(recv, "Automatisch gestopptes Timesheet", msg)
 
 
 def run_corrections_for_yesterday():
     day = (datetime.utcnow() - timedelta(days=1)).date()
+    day = date(2022, 12, 14)
     logging.info(f"Running nightly corrections {day}")
     empl = Angestellter.get_all_active("ANGESTELLTER")
     stud = Angestellter.get_all_active("WERKSTUDENT")
     schueler = Angestellter.get_all_active("SCHUELERAUSHILFE")
     insert_public_holidays(empl + stud + schueler, day)
     insert_auto_worktime(empl + stud + schueler, day)
-    stop_morning_timesheets(empl + stud + schueler, day)
+    stop_overnight_timesheets(empl + stud + schueler, day)
     check_not_worked(empl, day)
     # dont insert break times right away, because auto-stopped timesheets will be wrong
     #insert_breaktimes(empl, day)

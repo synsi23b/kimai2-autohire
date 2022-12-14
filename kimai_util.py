@@ -270,10 +270,10 @@ class Angestellter:
             break_end = break_start + timedelta(seconds=remaining_time)
             breakinfo = f"{datetime.utcnow()}: Gearbeitet: {total_duration/3600} Freiwillige Pausen: {break_times/3600}"
             if breaksheet:
-                logging.info(f"Updating mandatory break for user {self._email}: {remaining_time} seconds. Worked {total_duration} and took {break_times} break by sign out")
+                logging.info(f"Updating mandatory break for user {self._email} on {day}: {remaining_time} seconds. Worked {total_duration} and took {break_times} break by sign out")
                 db_util.update_timesheet_times_description(breaksheet, break_start, break_end, f"{breaksheet.description}\n{breakinfo}")
             else:
-                logging.info(f"Inserting mandatory break for user {self._email}: {remaining_time} seconds. Worked {total_duration} and took {break_times} break by sign out")
+                logging.info(f"Inserting mandatory break for user {self._email} on {day}: {remaining_time} seconds. Worked {total_duration} and took {break_times} break by sign out")
                 db_util.insert_timesheet(self._id, self._break_acti, self._project, break_start, break_end, breakinfo, 0, True)
         else:
             # dont have to insert a break, check if the breaksheet exists, than delete it

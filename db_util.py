@@ -370,6 +370,33 @@ def get_open_sheets(user_id:int, year:int, month:int) -> list:
     return list(cur)
 
 
+def get_tag_id(name:str, create_with_color_if_not_exists:str=""):
+    """
+    color has to be in the format: #ff0000
+    for red for example
+    """
+    cnx = get_db()
+    cur = cnx.cursor(buffered=True)
+    cur.execute(f"SELECT id FROM kimai2_tags WHERE name = '{name}';")
+    tags = list(cur)
+    if tags:
+        return tags[0][0]
+    if create_with_color_if_not_exists:
+        cur.execute(f"INSERT INTO kimai2_tags(id, name, color) VALUES(NULL, '{name}', '{create_with_color_if_not_exists}');")
+        cnx.commit()
+        return get_tag_id(name)
+    return 0
+
+
+def tag_if_not_tagged(sheet:int, tag:int):
+    cnx = get_db()
+    cur = cnx.cursor(buffered=True)
+    cur.execute(f"SELECT * FROM kimai2_timesheet_tags WHERE timesheet_id = {sheet} AND tag_id = {tag};")
+    if not list(cur):
+        cur.execute(f"INSERT INTO kimai2_timesheet_tags(timesheet_id, tag_id) VALUES({sheet}, {tag});")
+        cnx.commit()
+
+
 def stop_open_sheets(user_id:int, day:date) -> bool:
     #overrun_start_time = int(get_configuration("timesheet.rules.long_running_duration")) * 60 - 1
     #overrun_start_time = datetime.utcnow() - timedelta(seconds=overrun_start_time)
@@ -384,6 +411,7 @@ def stop_open_sheets(user_id:int, day:date) -> bool:
         start = UTC.localize(sheet.start).astimezone(usertz)
         end = datetime.utcnow().astimezone(usertz)
         update_timesheet_times_description(sheet, start, end, dsc)
+        tag_if_not_tagged(sheet.id, get_tag_id("Autostop", "#ff0000"))
     return stopped
 
 
