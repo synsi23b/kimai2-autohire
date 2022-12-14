@@ -45,9 +45,8 @@ def stop_morning_timesheets(employees:list[Angestellter], day:date):
                 recv = admins_mails
             else:
                 recv = admins_mails + [ma._email]
-            #send_mail(admins_mails, "Automatisch gestopptes Timesheet", msg)
-            print("sendmail ", recv, msg)
-        
+            send_mail(admins_mails, "Automatisch gestopptes Timesheet", msg)
+
 
 def run_corrections_for_yesterday():
     day = (datetime.utcnow() - timedelta(days=1)).date()
