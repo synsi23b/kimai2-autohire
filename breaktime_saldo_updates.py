@@ -33,6 +33,6 @@ if __name__ == "__main__":
     logging.basicConfig(filename=str(thisfile.parent.parent.resolve() / f"kimai2_autohire_{thisfile.stem}.log"),
     format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
 
-    run_past_breaktimes_saldo_until(date(2022, 11, 22))
+    run_past_breaktimes_saldo_until(date(2022, 11, 23))
     #run_past_corrections_for_every_active_user()
     #run_past_breaktimes()

@@ -275,10 +275,12 @@ class Angestellter:
             #     break_start = datetime(day.year, day.month, day.day, tzinfo=UTC)
             break_start = datetime(day.year, day.month, day.day, tzinfo=UTC)
             break_end = break_start + timedelta(seconds=remaining_time)
-            breakinfo = f"{datetime.utcnow():%Y-%m-%d %H:%M}: Gearbeitet: {total_duration/3600:.2f} h Freiwillige Pausen: {break_times/60:.2f} Minuten"
+            total_h = int(total_duration/3600)
+            total_min = int(total_duration/60) - (total_h * 60)
+            breakinfo = f"{datetime.utcnow():%Y-%m-%d %H:%M}: Arbeit: {total_h}:{total_min} Pausen: {break_times/60:.2f} min"
             if breaksheet:
                 logging.info(f"Updating mandatory break for user {self._email} on {day}: {remaining_time} seconds. Worked {total_duration} and took {break_times} break by sign out")
-                db_util.update_timesheet_times_description(breaksheet, break_start, break_end, f"{breaksheet.description}\n{breakinfo}")
+                db_util.update_timesheet_times_description(breaksheet, break_start, break_end, f"{breakinfo}\n{breaksheet.description}")
             else:
                 logging.info(f"Inserting mandatory break for user {self._email} on {day}: {remaining_time} seconds. Worked {total_duration} and took {break_times} break by sign out")
                 db_util.insert_timesheet(self._id, self._break_acti, self._project, break_start, break_end, breakinfo, 0, True)
@@ -309,13 +311,12 @@ class Angestellter:
                     worked_time = db_util.sum_times_range(self._id, start.date(), end.date())
                     has_to_work = 0
                     wtwd = self._worktime_weekdays
-                    while start < end:
+                    while start <= end:
                         has_to_work += wtwd[start.weekday()]
                         start += td1d
-                    range_difference = worked_time - has_to_work
-                    saldo = a.duration + range_difference
-                    if b.duration != saldo:
-                        db_util.update_saldo_duration_description_unsafe(b.id, saldo, f"{datetime.utcnow():%Y-%m-%d %H:%M}: {saldo/3600:.2f}h\n{b.description}")
+                    new_saldo = worked_time - has_to_work
+                    if b.duration != new_saldo:
+                        db_util.update_saldo_duration_description_unsafe(b.id, new_saldo, f"{datetime.utcnow():%Y-%m-%d %H:%M}: {new_saldo/3600:.2f}h\n{b.description}")
             else:
                 if saldo_sheets[-1].date_tz < day:
                     # the new saldo request is further in the future compared to the last saldo. 
