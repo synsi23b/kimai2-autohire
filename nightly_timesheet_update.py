@@ -25,9 +25,9 @@ def insert_auto_worktime(employees:list[Angestellter], day:date):
         ma.insert_auto_worktime(day)
 
 
-def insert_breaktimes(employees:list[Angestellter], day:date):
+def update_breaktimes(employees:list[Angestellter], day:date):
     for ma in employees:
-        ma.insert_breaktime(day)
+        ma.update_breaktime(day)
 
 
 def stop_overnight_timesheets(employees:list[Angestellter], day:date):

@@ -13,7 +13,7 @@ import logging
 import pytz
 
 
-UTC = pytz.timezone("UTC")
+UTC = pytz.UTC
 
 
 dotenv.load_dotenv()
@@ -118,6 +118,7 @@ class Angestellter:
             self._break_acti = Angestellter.__workingconfig[self._role]["breaktime"]
             self._freeday_acti = Angestellter.__workingconfig[self._role]["freeday"]
             self._noshow_acti = Angestellter.__workingconfig[self._role]["noshow"]
+            self._saldo_acti = Angestellter.__workingconfig["saldo_id"]
 
 
     @staticmethod
@@ -203,11 +204,15 @@ class Angestellter:
 
     
     def sum_weekly_time(self, day:date):
-        return db_util.sum_times_weeks(self._id, [day], )[0][2]
+        return db_util.sum_times_weeks(self._id, [day] )[0][2]
 
 
     def get_registration_date(self):
         return self._registration.date()
+
+    
+    def get_first_record_date(self):
+        return db_util.get_first_timesheet_date(self._id) 
 
     
     def receive_admin_mails(self):
@@ -237,7 +242,7 @@ class Angestellter:
                 logging.info(f"Autowork: user {self._email} has filled weekly quota. Doing nothing")
 
     
-    def insert_breaktime(self, day):
+    def update_breaktime(self, day):
         # check the total worktime is greater than 6 or 8 hours
         # between 6 and 8 hours, 30 minutes break are neccessairy
         # over 8 hours 1 hour break is neccessairy
@@ -254,7 +259,9 @@ class Angestellter:
             break_times = db_util.calculate_timesheet_break_times(sheets)
             remaining_time = 1800 - break_times
         # get breaksheet if it already exists to update instead of insert
-        breaksheet = db_util.get_sheets_for_day(self._id, day, [self._break_acti])[0]
+        breaksheet = db_util.get_sheets_for_day(self._id, day, [self._break_acti])
+        if breaksheet:
+            breaksheet = breaksheet[0]
         if remaining_time > 0:
             # have to insert a break of remaining_time seconds
             if breaksheet and breaksheet.duration == -remaining_time:
@@ -268,7 +275,7 @@ class Angestellter:
             #     break_start = datetime(day.year, day.month, day.day, tzinfo=UTC)
             break_start = datetime(day.year, day.month, day.day, tzinfo=UTC)
             break_end = break_start + timedelta(seconds=remaining_time)
-            breakinfo = f"{datetime.utcnow()}: Gearbeitet: {total_duration/3600} Freiwillige Pausen: {break_times/3600}"
+            breakinfo = f"{datetime.utcnow():%Y-%m-%d %H:%M}: Gearbeitet: {total_duration/3600:.2f} h Freiwillige Pausen: {break_times/60:.2f} Minuten"
             if breaksheet:
                 logging.info(f"Updating mandatory break for user {self._email} on {day}: {remaining_time} seconds. Worked {total_duration} and took {break_times} break by sign out")
                 db_util.update_timesheet_times_description(breaksheet, break_start, break_end, f"{breaksheet.description}\n{breakinfo}")
@@ -279,6 +286,57 @@ class Angestellter:
             # dont have to insert a break, check if the breaksheet exists, than delete it
             if breaksheet:
                 db_util.timesheet_delete(breaksheet.id)
+
+
+    def update_saldo(self, day):
+        saldo_sheets = db_util.get_all_saldo_sheets(self._id, self._saldo_acti)
+        if not saldo_sheets:
+            # no saldo present, create from zero until DAY
+            start = self.get_first_record_date()
+            if start is None:
+                return
+            start = datetime(start.year, start.month, start.day, tzinfo=UTC)
+            db_util.insert_timesheet(self._id, self._saldo_acti, self._project, start, start, f"{datetime.utcnow()}: Startsaldo 0", 0, True)
+            self.update_saldo(day)
+        else:
+            if saldo_sheets[-1].date_tz == day:
+                # the newest saldo is on the same day requested for generation, so update its value any changed ones on between
+                for a, b in zip(saldo_sheets[:-1], saldo_sheets[1:]):
+                    # calculate the time between [a b) and than update b if neccesairy
+                    start = a.start
+                    td1d = timedelta(days=1)
+                    end = b.start - td1d
+                    worked_time = db_util.sum_times_range(self._id, start.date(), end.date())
+                    has_to_work = 0
+                    wtwd = self._worktime_weekdays
+                    while start < end:
+                        has_to_work += wtwd[start.weekday()]
+                        start += td1d
+                    range_difference = worked_time - has_to_work
+                    saldo = a.duration + range_difference
+                    if b.duration != saldo:
+                        db_util.update_saldo_duration_description_unsafe(b.id, saldo, f"{datetime.utcnow():%Y-%m-%d %H:%M}: {saldo/3600:.2f}h\n{b.description}")
+            else:
+                if saldo_sheets[-1].date_tz < day:
+                    # the new saldo request is further in the future compared to the last saldo. 
+                    # create a dummy value and than run the function again to re-use same day update
+                    start = datetime(day.year, day.month, day.day, tzinfo=UTC)
+                    db_util.insert_timesheet(self._id, self._saldo_acti, self._project, start, start, f"", 0, True)
+                    self.update_saldo(day)
+                elif saldo_sheets[0].date_tz < day:
+                    # the new saldo day is somewhere in between the existing saldo_sheets or completely new. search for it
+                    notfound = True
+                    for sheet in saldo_sheets:
+                        if sheet.date_tz == day:
+                            notfound = False
+                            break
+                    if notfound:
+                        # not found, so create entry here, than run the whole calculation again until the newest saldo day
+                        start = datetime(day.year, day.month, day.day, tzinfo=UTC)
+                        db_util.insert_timesheet(self._id, self._saldo_acti, self._project, start, start, f"", 0, True)
+                    self.update_saldo(saldo_sheets[0].date_tz)
+
+                
 
 
 class Worker:

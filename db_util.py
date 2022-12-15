@@ -280,14 +280,17 @@ def select_timesheets(where:str, order:str=""):
     cnx = get_db()
     cur = cnx.cursor(buffered=True)
     if order == "":
-        cur.execute(f"SELECT * FROM kimai2_timesheet WHERE {where};")
+        querry = f"SELECT * FROM kimai2_timesheet WHERE {where};"
+        cur.execute(querry)
     else:
-        cur.execute(f"SELECT * FROM kimai2_timesheet WHERE {where} ORDER BY {order};")
+        querry = f"SELECT * FROM kimai2_timesheet WHERE {where} ORDER BY {order};"
+        cur.execute(querry)
     return [Timesheet(*x) for x in cur]
 
 
 def get_sheets_for_day(user_id:int, day:date, activities:list[int]) -> list[Timesheet]:
-    return select_timesheets(f"user = {user_id} AND date_tz = '{day}' AND end_time IS NOT NULL and activity_id IN ({','.join(activities)})", "start_time ASC")
+    actilist = ','.join([str(a) for a in activities])
+    return select_timesheets(f"user = {user_id} AND date_tz = '{day}' AND end_time IS NOT NULL and activity_id IN ({actilist})", "start_time ASC")
 
 
 def calculate_timesheet_break_times(sheets:list[Timesheet]) ->  int:
@@ -296,14 +299,13 @@ def calculate_timesheet_break_times(sheets:list[Timesheet]) ->  int:
     """
     pause = 0
     if len(sheets) > 1:
-        pairs = zip(sheets, sheets[1:] + [None])
+        pairs = zip(sheets[:-1], sheets[1:])
         for a, b in pairs:
-            if b is not None:
-                _, a_end = a.tzaware_start_end()
-                b_start, _ = b.tzaware_start_end()
-                interval = (b_start - a_end).total_seconds()
-                if interval >= (15 * 60):
-                    pause += interval
+            _, a_end = a.tzaware_start_end()
+            b_start, _ = b.tzaware_start_end()
+            interval = (b_start - a_end).total_seconds()
+            if interval >= (15 * 60):
+                pause += interval
     return pause    
 
 
@@ -322,6 +324,16 @@ def get_generate_projects() -> list:
     cur = cnx.cursor(buffered=True)
     cur.execute(f"SELECT id, name, comment FROM kimai2_projects WHERE comment LIKE '%*generate_sheets*%';")
     return list(cur)
+
+
+def get_first_timesheet_date(userid:int) -> date:
+    cnx = get_db()
+    cur = cnx.cursor(buffered=True)
+    cur.execute(f"SELECT date_tz FROM kimai2_timesheet WHERE user = {userid} ORDER BY date_tz ASC LIMIT 1;")
+    try:
+        return next(cur)[0]
+    except StopIteration:
+        return None
 
 
 def get_sheets_for_project(proj_id, year:int, month:int) -> list:
@@ -413,6 +425,20 @@ def stop_open_sheets(user_id:int, day:date) -> bool:
         update_timesheet_times_description(sheet, start, end, dsc)
         tag_if_not_tagged(sheet.id, get_tag_id("Autostop", "#ff0000"))
     return stopped
+
+
+def get_all_saldo_sheets(user_id:int, saldo_acti_id:int):
+    return select_timesheets(f"user = {user_id} AND activity_id = {saldo_acti_id}", "date_tz ASC")
+
+
+def update_saldo_duration_description_unsafe(sheet_id:int, saldo_seconds:int, description:str):
+    """
+    This function does not recalculate rates or anything. It is suppposed to be run only with the Saldo calculations
+    """
+    cnx = get_db()
+    cur = cnx.cursor(buffered=True)
+    cur.execute(f"UPDATE kimai2_timesheet SET duration = {saldo_seconds}, description = '{description}', modified_at = '{datetime.utcnow()}' WHERE id = {sheet_id};")
+    cnx.commit()
 
 
 def get_project_by_activity(activity_id):
