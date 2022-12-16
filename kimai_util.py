@@ -185,8 +185,8 @@ class Angestellter:
 
     def fill_missing_workday(self, workday:date):
         if self.has_not_worked(workday):
-            dt = datetime(workday.year, workday.month, workday.day)
-            start = end = pytz.timezone(self._preferences["timezone"]).localize(dt)
+            start = end = datetime(workday.year, workday.month, workday.day, tzinfo=UTC)
+            #start = end = pytz.timezone(self._preferences["timezone"]).localize(dt)
             if self._worktime_weekdays[workday.weekday()] > 0:
                 logging.info(f"Insert missing day for user {self._email}")
                 db_util.insert_timesheet(self._id, self._noshow_acti, self._project, start, end, "", 0, False)
