@@ -250,14 +250,17 @@ class Angestellter:
         sheets = db_util.get_sheets_for_day(self._id, day, self._work_actis)
         total_duration = sum([ts.duration for ts in sheets])
         remaining_time = 0
-        if total_duration > (8 * 60 * 60):
-            # work over 8:00 hours -> minimum break time 3600s (1h)
-            break_times = db_util.calculate_timesheet_break_times(sheets)
-            remaining_time = 3600 - break_times
-        elif total_duration > (6 * 60 * 60):
-            # work between 6:01 and 8:00 hours -> minimum break time 1800s (30min)
-            break_times = db_util.calculate_timesheet_break_times(sheets)
-            remaining_time = 1800 - break_times
+        if total_duration != 0 and self._role == "ANGESTELLTER":
+            remaining_time = 3600
+        else:
+            if total_duration > (8 * 60 * 60):
+                # work over 8:00 hours -> minimum break time 3600s (1h)
+                break_times = db_util.calculate_timesheet_break_times(sheets)
+                remaining_time = 3600 - break_times
+            #elif total_duration > (6 * 60 * 60):
+                # work between 6:01 and 8:00 hours -> minimum break time 1800s (30min)
+            #    break_times = db_util.calculate_timesheet_break_times(sheets)
+            #    remaining_time = 1800 - break_times
         # get breaksheet if it already exists to update instead of insert
         breaksheet = db_util.get_sheets_for_day(self._id, day, [self._break_acti])
         if breaksheet:
@@ -275,14 +278,17 @@ class Angestellter:
             #     break_start = datetime(day.year, day.month, day.day, tzinfo=UTC)
             break_start = datetime(day.year, day.month, day.day, tzinfo=UTC)
             break_end = break_start + timedelta(seconds=remaining_time)
-            total_h = int(total_duration/3600)
-            total_min = int(total_duration/60) - (total_h * 60)
-            breakinfo = f"{datetime.utcnow():%Y-%m-%d %H:%M}: Arbeit: {total_h}:{total_min} Pausen: {break_times/60:.2f} min"
+            if self._role == "ANGESTELLTER":
+                breakinfo = f"{datetime.utcnow():%Y-%m-%d %H:%M}: Regulaere 1h Pause"
+            else:
+                total_h = int(total_duration/3600)
+                total_min = int(total_duration/60) - (total_h * 60)
+                breakinfo = f"{datetime.utcnow():%Y-%m-%d %H:%M}: Arbeit: {total_h}:{total_min} Pausen: {break_times/60:.2f} min"
             if breaksheet:
-                logging.info(f"Updating mandatory break for user {self._email} on {day}: {remaining_time} seconds. Worked {total_duration} and took {break_times} break by sign out")
+                logging.info(f"Updating mandatory break for user {self._email} on {day}: {remaining_time} seconds. {breakinfo}")
                 db_util.update_timesheet_times_description(breaksheet, break_start, break_end, f"{breakinfo}\n{breaksheet.description}")
             else:
-                logging.info(f"Inserting mandatory break for user {self._email} on {day}: {remaining_time} seconds. Worked {total_duration} and took {break_times} break by sign out")
+                logging.info(f"Inserting mandatory break for user {self._email} on {day}: {remaining_time} seconds. {breakinfo}")
                 db_util.insert_timesheet(self._id, self._break_acti, self._project, break_start, break_end, breakinfo, 0, True)
         else:
             # dont have to insert a break, check if the breaksheet exists, than delete it

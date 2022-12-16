@@ -58,24 +58,30 @@ def run_corrections_for_yesterday():
     insert_auto_worktime(empl + stud + schueler, day)
     stop_overnight_timesheets(empl + stud + schueler, day)
     check_not_worked(empl, day)
-    # dont insert break times right away, because auto-stopped timesheets will be wrong
-    #insert_breaktimes(empl, day)
+    update_breaktimes(empl + stud + schueler, day)
 
 
 def run_past_breaktimes():
     empl = Angestellter.get_all_active("ANGESTELLTER")
+    stud = Angestellter.get_all_active("WERKSTUDENT")
+    schueler = Angestellter.get_all_active("SCHUELERAUSHILFE")
     for ma in empl:
         # get user registering date
-        day = ma.get_registration_date()
+        day = ma.get_first_record_date()
         # get today for range checking in the loop
         today = datetime.utcnow().date()
         while day < today:
-            #insert_public_holidays(mal, day)
-            #if day > date(2022, 11, 22):
-            #    insert_auto_worktime(mal, day)
-            #if ma._role == "ANGESTELLTER":
-            #    check_not_worked(mal, day)
-            insert_breaktimes(empl, day)
+            ma.update_breaktime(day)
+            day = day + timedelta(days=1)
+    for st in stud + schueler:
+        # get user registering date
+        first = st.get_first_record_date()
+        cal = date(2022, 11, 23)
+        day = max(first, cal)
+        # get today for range checking in the loop
+        today = datetime.utcnow().date()
+        while day < today:
+            st.update_breaktime(day)
             day = day + timedelta(days=1)
 
 
