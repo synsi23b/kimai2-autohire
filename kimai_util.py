@@ -347,6 +347,12 @@ class Angestellter:
                         db_util.insert_timesheet(self._id, self._flex_acti, self._project, start, start, "0,0,0,0,0,0,0,0", 0, True)
                     self.update_flextime(flex_sheets[0].date_tz)
 
+    def export_monthly_journal(self, start:date, end:date, outpath:Path):
+        if db_util.check_timesheet_exists_range(self._id, start, end) > 0:
+            export_invoice(self._user, start, end, "monatsjournal", outpath)
+            return True
+        return False
+
 
 class Worker:
     def __init__(self, id:int, sheets:list):
@@ -510,10 +516,6 @@ def export_invoice(user:str, start:date, end:date, template:str, outpath:str|Pat
     if res.returncode != 0:
         raise RuntimeError(f"{res.stderr}\n\n{res.stdout}")
     print(res.stdout)
-
-
-def export_monthly_journal_student(user:str, start:date, end:date, outpath:Path):
-    export_invoice(user, start, end, "journal_student", outpath)
     
 
 if __name__ == "__main__":

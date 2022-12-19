@@ -531,6 +531,18 @@ def check_timesheet_exists(user_id:int, date_tz:date, activity_id:int=0, descrip
     return next(cur)[0]
 
 
+def check_timesheet_exists_range(user_id:int, start:date, end:date, activity_id:int=0, description:str=""):
+    cnx = get_db()
+    cur = cnx.cursor(buffered=True)
+    if activity_id == 0:
+        cur.execute(f"SELECT COUNT(id) from kimai2_timesheet WHERE user = {user_id} AND date_tz between '{start}' AND '{end}';")
+    elif description == "":
+        cur.execute(f"SELECT COUNT(id) from kimai2_timesheet WHERE user = {user_id} AND activity_id = {activity_id} AND date_tz between '{start}' AND '{end}';")
+    else:
+        cur.execute(f"SELECT COUNT(id) from kimai2_timesheet WHERE user = {user_id} AND activity_id = {activity_id} AND date_tz between '{start}' AND '{end}' AND description LIKE '%{description}%';")
+    return next(cur)[0]
+
+
 def get_holidays(start:date, end:date, state = ""):
     cnx = get_db()
     cur = cnx.cursor()
