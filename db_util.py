@@ -427,17 +427,16 @@ def stop_open_sheets(user_id:int, day:date) -> bool:
     return stopped
 
 
-def get_all_saldo_sheets(user_id:int, saldo_acti_id:int):
-    return select_timesheets(f"user = {user_id} AND activity_id = {saldo_acti_id}", "date_tz ASC")
+def get_all_flex_sheets(user_id:int, flex_acti_id:int):
+    return select_timesheets(f"user = {user_id} AND activity_id = {flex_acti_id}", "date_tz ASC")
 
 
-def update_saldo_duration_description_unsafe(sheet_id:int, saldo_seconds:int, description:str):
-    """
-    This function does not recalculate rates or anything. It is suppposed to be run only with the Saldo calculations
-    """
+def update_flex_description(sheet_id:int, flex_seconds:int, weekday_soll:list[int]):
+    flexlist = [flex_seconds] + weekday_soll
+    flexentry = ",".join([str(x) for x in flexlist])
     cnx = get_db()
     cur = cnx.cursor(buffered=True)
-    cur.execute(f"UPDATE kimai2_timesheet SET duration = {saldo_seconds}, description = '{description}', modified_at = '{datetime.utcnow()}' WHERE id = {sheet_id};")
+    cur.execute(f"UPDATE kimai2_timesheet SET description = '{flexentry}', modified_at = '{datetime.utcnow()}' WHERE id = {sheet_id};")
     cnx.commit()
 
 

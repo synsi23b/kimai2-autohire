@@ -12,9 +12,9 @@ def update_breaktimes_on_day(employees:list[Angestellter], day:date):
         ma.update_breaktime(day)
 
 
-def update_saldo(employees:list[Angestellter], day:date):
+def update_flextime(employees:list[Angestellter], day:date):
     for ma in employees:
-        ma.update_saldo(day)
+        ma.update_flextime(day)
 
 
 def run_past_breaktimes_saldo_until(day:date):
@@ -25,7 +25,7 @@ def run_past_breaktimes_saldo_until(day:date):
         while corday < day:
             ma.update_breaktime(corday)
             corday += timedelta(days=1)
-    update_saldo(empl, day)
+    update_flextime(empl, day)
 
 
 def run_breaktime_update_90_days():
@@ -41,6 +41,26 @@ def run_breaktime_update_90_days():
             calcday += plus1
 
 
+def run_past_breaktime():
+    # run the check for the past 90 days
+    today = date.today()
+    #minus90 = today - timedelta(days=90)
+    plus1 = timedelta(days=1)
+    empl = Angestellter.get_all_active("ANGESTELLTER") 
+    empl += Angestellter.get_all_active("WERKSTUDENT")
+    for ma in empl:
+        firstday = ma.get_first_record_date()
+        calcday = firstday
+        while calcday < today:
+            ma.update_breaktime(calcday)
+            calcday += plus1
+
+
+def run_flextime_for_day(day:date):
+    empl = Angestellter.get_all_active("ANGESTELLTER")
+    update_flextime(empl, day)
+
+
 if __name__ == "__main__":
     thisfile = Path(__file__)
     logging.basicConfig(filename=str(thisfile.parent.parent.resolve() / f"kimai2_autohire_{thisfile.stem}.log"),
@@ -53,5 +73,6 @@ if __name__ == "__main__":
 
     #run_past_breaktimes_saldo_until(date(2022, 11, 23))
     #run_past_corrections_for_every_active_user()
-    #run_past_breaktimes()
-    run_breaktime_update_90_days()
+    run_past_breaktime()
+    #run_breaktime_update_90_days()
+    run_flextime_for_day(date(2022, 11, 23))

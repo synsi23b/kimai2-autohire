@@ -118,7 +118,7 @@ class Angestellter:
             self._break_acti = Angestellter.__workingconfig[self._role]["breaktime"]
             self._freeday_acti = Angestellter.__workingconfig[self._role]["freeday"]
             self._noshow_acti = Angestellter.__workingconfig[self._role]["noshow"]
-            self._saldo_acti = Angestellter.__workingconfig["saldo_id"]
+            self._flex_acti = Angestellter.__workingconfig["flex_id"]
 
 
     @staticmethod
@@ -251,7 +251,10 @@ class Angestellter:
         total_duration = sum([ts.duration for ts in sheets])
         remaining_time = 0
         if total_duration != 0 and self._role == "ANGESTELLTER":
-            remaining_time = 3600
+            if total_duration > (6 * 60 * 60):
+                remaining_time = 1800
+            if total_duration > (8 * 60 * 60):
+                remaining_time = 3600
         else:
             if total_duration > (8 * 60 * 60):
                 # work over 8:00 hours -> minimum break time 3600s (1h)
@@ -278,11 +281,11 @@ class Angestellter:
             #     break_start = datetime(day.year, day.month, day.day, tzinfo=UTC)
             break_start = datetime(day.year, day.month, day.day, tzinfo=UTC)
             break_end = break_start + timedelta(seconds=remaining_time)
+            total_h = int(total_duration/3600)
+            total_min = int(total_duration/60) - (total_h * 60)
             if self._role == "ANGESTELLTER":
-                breakinfo = f"{datetime.utcnow():%Y-%m-%d %H:%M}: Regulaere 1h Pause"
+                breakinfo = f"{datetime.utcnow():%Y-%m-%d %H:%M}: Arbeit: {total_h}:{total_min} -> Pause {remaining_time/60:.2f} min"
             else:
-                total_h = int(total_duration/3600)
-                total_min = int(total_duration/60) - (total_h * 60)
                 breakinfo = f"{datetime.utcnow():%Y-%m-%d %H:%M}: Arbeit: {total_h}:{total_min} Pausen: {break_times/60:.2f} min"
             if breaksheet:
                 logging.info(f"Updating mandatory break for user {self._email} on {day}: {remaining_time} seconds. {breakinfo}")
@@ -296,20 +299,20 @@ class Angestellter:
                 db_util.timesheet_delete(breaksheet.id)
 
 
-    def update_saldo(self, day):
-        saldo_sheets = db_util.get_all_saldo_sheets(self._id, self._saldo_acti)
-        if not saldo_sheets:
-            # no saldo present, create from zero until DAY
+    def update_flextime(self, day):
+        flex_sheets = db_util.get_all_flex_sheets(self._id, self._flex_acti)
+        if not flex_sheets:
+            # no flex present, create from zero until DAY
             start = self.get_first_record_date()
             if start is None:
                 return
             start = datetime(start.year, start.month, start.day, tzinfo=UTC)
-            db_util.insert_timesheet(self._id, self._saldo_acti, self._project, start, start, f"{datetime.utcnow()}: Startsaldo 0", 0, True)
-            self.update_saldo(day)
+            db_util.insert_timesheet(self._id, self._flex_acti, self._project, start, start, "0,0,0,0,0,0,0,0", 0, True)
+            self.update_flextime(day)
         else:
-            if saldo_sheets[-1].date_tz == day:
-                # the newest saldo is on the same day requested for generation, so update its value any changed ones on between
-                for a, b in zip(saldo_sheets[:-1], saldo_sheets[1:]):
+            if flex_sheets[-1].date_tz == day:
+                # the newest flex is on the same day requested for generation, so update its value any changed ones on between
+                for a, b in zip(flex_sheets[:-1], flex_sheets[1:]):
                     # calculate the time between [a b) and than update b if neccesairy
                     start = a.start
                     td1d = timedelta(days=1)
@@ -320,30 +323,29 @@ class Angestellter:
                     while start <= end:
                         has_to_work += wtwd[start.weekday()]
                         start += td1d
-                    new_saldo = worked_time - has_to_work
-                    if b.duration != new_saldo:
-                        db_util.update_saldo_duration_description_unsafe(b.id, new_saldo, f"{datetime.utcnow():%Y-%m-%d %H:%M}: {new_saldo/3600:.2f}h\n{b.description}")
+                    new_flex = worked_time - has_to_work
+                    bflex = int(b.description.split(",")[0])
+                    if bflex != new_flex:
+                        db_util.update_flex_description(b.id, new_flex, wtwd)
             else:
-                if saldo_sheets[-1].date_tz < day:
-                    # the new saldo request is further in the future compared to the last saldo. 
+                if flex_sheets[-1].date_tz < day:
+                    # the new flex request is further in the future compared to the last flex. 
                     # create a dummy value and than run the function again to re-use same day update
                     start = datetime(day.year, day.month, day.day, tzinfo=UTC)
-                    db_util.insert_timesheet(self._id, self._saldo_acti, self._project, start, start, f"", 0, True)
-                    self.update_saldo(day)
-                elif saldo_sheets[0].date_tz < day:
-                    # the new saldo day is somewhere in between the existing saldo_sheets or completely new. search for it
+                    db_util.insert_timesheet(self._id, self._flex_acti, self._project, start, start, "0,0,0,0,0,0,0,0", 0, True)
+                    self.update_flextime(day)
+                elif flex_sheets[0].date_tz < day:
+                    # the new flex day is somewhere in between the existing flex_sheets or completely new. search for it
                     notfound = True
-                    for sheet in saldo_sheets:
+                    for sheet in flex_sheets:
                         if sheet.date_tz == day:
                             notfound = False
                             break
                     if notfound:
-                        # not found, so create entry here, than run the whole calculation again until the newest saldo day
+                        # not found, so create entry here, than run the whole calculation again until the newest flex day
                         start = datetime(day.year, day.month, day.day, tzinfo=UTC)
-                        db_util.insert_timesheet(self._id, self._saldo_acti, self._project, start, start, f"", 0, True)
-                    self.update_saldo(saldo_sheets[0].date_tz)
-
-                
+                        db_util.insert_timesheet(self._id, self._flex_acti, self._project, start, start, "0,0,0,0,0,0,0,0", 0, True)
+                    self.update_flextime(flex_sheets[0].date_tz)
 
 
 class Worker:
