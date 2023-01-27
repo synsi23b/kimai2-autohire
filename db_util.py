@@ -431,9 +431,13 @@ def get_all_flex_sheets(user_id:int, flex_acti_id:int):
     return select_timesheets(f"user = {user_id} AND activity_id = {flex_acti_id}", "date_tz ASC")
 
 
-def update_flex_description(sheet_id:int, flex_seconds:int, weekday_soll:list[int]):
+def generate_flex_description(flex_seconds:int, weekday_soll:list[int]):
     flexlist = [flex_seconds] + weekday_soll
     flexentry = ",".join([str(x) for x in flexlist])
+    return flexentry
+
+
+def update_flex_description(sheet_id:int, flexentry:str):
     cnx = get_db()
     cur = cnx.cursor(buffered=True)
     cur.execute(f"UPDATE kimai2_timesheet SET description = '{flexentry}', modified_at = '{datetime.utcnow()}' WHERE id = {sheet_id};")

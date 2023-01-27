@@ -73,6 +73,7 @@ if __name__ == "__main__":
 
     #run_past_breaktimes_saldo_until(date(2022, 11, 23))
     #run_past_corrections_for_every_active_user()
-    run_past_breaktime()
+    #run_past_breaktime()
     #run_breaktime_update_90_days()
-    run_flextime_for_day(date(2022, 11, 23))
+    #run_flextime_for_day(date(2022, 11, 23))
+    run_flextime_for_day(date(2022, 12, 19))

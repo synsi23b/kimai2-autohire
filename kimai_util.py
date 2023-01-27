@@ -302,12 +302,14 @@ class Angestellter:
     def update_flextime(self, day):
         flex_sheets = db_util.get_all_flex_sheets(self._id, self._flex_acti)
         if not flex_sheets:
+            logging.info(f"Creating flextime start for user {self._email} -> {self._worktime_weekdays}")
             # no flex present, create from zero until DAY
             start = self.get_first_record_date()
             if start is None:
                 return
             start = datetime(start.year, start.month, start.day, tzinfo=UTC)
-            db_util.insert_timesheet(self._id, self._flex_acti, self._project, start, start, "0,0,0,0,0,0,0,0", 0, True)
+            flexdesc = db_util.generate_flex_description(0, self._worktime_weekdays)
+            db_util.insert_timesheet(self._id, self._flex_acti, self._project, start, start, flexdesc, 0, True)
             self.update_flextime(day)
         else:
             if flex_sheets[-1].date_tz == day:
@@ -326,13 +328,17 @@ class Angestellter:
                     new_flex = worked_time - has_to_work
                     bflex = int(b.description.split(",")[0])
                     if bflex != new_flex:
-                        db_util.update_flex_description(b.id, new_flex, wtwd)
+                        flexentry = db_util.generate_flex_description(new_flex, wtwd)
+                        logging.info(f"Update old flextime for user {self._email} -> ID {b.id} DATE {b.date_tz} FROM {b.description} TO {flexentry}")
+                        db_util.update_flex_description(b.id, flexentry)
             else:
                 if flex_sheets[-1].date_tz < day:
                     # the new flex request is further in the future compared to the last flex. 
                     # create a dummy value and than run the function again to re-use same day update
                     start = datetime(day.year, day.month, day.day, tzinfo=UTC)
-                    db_util.insert_timesheet(self._id, self._flex_acti, self._project, start, start, "0,0,0,0,0,0,0,0", 0, True)
+                    flexdesc = db_util.generate_flex_description(0, self._worktime_weekdays)
+                    logging.info(f"Insert new flextime for user {self._email} ->  DATE {start} DESC {flexdesc}")
+                    db_util.insert_timesheet(self._id, self._flex_acti, self._project, start, start, flexdesc, 0, True)
                     self.update_flextime(day)
                 elif flex_sheets[0].date_tz < day:
                     # the new flex day is somewhere in between the existing flex_sheets or completely new. search for it
@@ -344,7 +350,9 @@ class Angestellter:
                     if notfound:
                         # not found, so create entry here, than run the whole calculation again until the newest flex day
                         start = datetime(day.year, day.month, day.day, tzinfo=UTC)
-                        db_util.insert_timesheet(self._id, self._flex_acti, self._project, start, start, "0,0,0,0,0,0,0,0", 0, True)
+                        flexdesc = db_util.generate_flex_description(0, self._worktime_weekdays)
+                        logging.info(f"Insert new flextime for user {self._email} ->  DATE {start} DESC {flexdesc}")
+                        db_util.insert_timesheet(self._id, self._flex_acti, self._project, start, start, flexdesc, 0, True)
                     self.update_flextime(flex_sheets[0].date_tz)
 
     def export_monthly_journal(self, start:date, end:date, outpath:Path):
