@@ -194,6 +194,13 @@ class Angestellter:
                 logging.info(f"Insert free day for user {self._email}")
                 db_util.insert_timesheet(self._id, self._freeday_acti, self._project, start, end, "", 0, False)
 
+    
+    def fill_missing_freeday(self, workday:date):
+        if self.has_not_worked(workday):
+            start = end = datetime(workday.year, workday.month, workday.day, tzinfo=UTC)
+            logging.info(f"Insert free day for user {self._email}")
+            db_util.insert_timesheet(self._id, self._freeday_acti, self._project, start, end, "", 0, False)
+
 
     def _float_to_dt(self, day, value):
         hours = int(value)
@@ -355,11 +362,11 @@ class Angestellter:
                         db_util.insert_timesheet(self._id, self._flex_acti, self._project, start, start, flexdesc, 0, True)
                     self.update_flextime(flex_sheets[0].date_tz)
 
-    def export_monthly_journal(self, start:date, end:date, outpath:Path):
+    def export_monthly_journal(self, start:date, end:date, outfolder:Path):
+        res = []
         if db_util.check_timesheet_exists_range(self._id, start, end) > 0:
-            export_invoice(self._user, start, end, "monatsjournal", outpath)
-            return True
-        return False
+            res = export_invoice(self._user, start, end, "monatsjournal", outfolder)
+        return res
 
 
 class Worker:
@@ -499,7 +506,7 @@ def get_gen_projects():
     return [AutogenProjekt(*x) for x in db_util.get_generate_projects()]
 
 
-def export_invoice(user:str, start:date, end:date, template:str, outpath:str|Path) -> str:
+def export_invoice(user:str, start:date, end:date, template:str, outfolder:Path) -> str:
     #   Usage:
     #   kimai:invoice:create [options]
 
@@ -520,10 +527,15 @@ def export_invoice(user:str, start:date, end:date, template:str, outpath:str|Pat
     #       --preview[=PREVIEW]              Absolute path for a rendered preview of the invoice, which will neither be saved nor the items be marked as exported.
     #       --preview-unique                 Adds a unique part to the filename of the generated invoice preview file, so there is no chance that they get overwritten on same project name.
     #./bin/console kimai:invoice:create --user=presley85 --template=myinvoi --exported=all --by-customer
-    res = subprocess.run([get_console(), "kimai:invoice:create", f"--user={user}", f"--start={start.strftime('%Y-%m-%d')}", f"--end={end.strftime('%Y-%m-%d')}", f"--template={template}", f"--by-customer", "--exported=all", f"--preview={outpath}"], capture_output=True)
+    res = subprocess.run([get_console(), "kimai:invoice:create", f"--user={user}", f"--start={start.strftime('%Y-%m-%d')}", f"--end={end.strftime('%Y-%m-%d')}", f"--template={template}", f"--by-customer", "--exported=all", f"--preview={str(outfolder)}", "--preview-unique"], capture_output=True)
     if res.returncode != 0:
         raise RuntimeError(f"{res.stderr}\n\n{res.stdout}")
-    print(res.stdout)
+    output = str(res.stdout, "utf-8")
+    logging.info(output)
+    filelist = re.findall("\|\s(.+?\.pdf)\s\|", output)
+    for f in filelist:
+        logging.info(f)
+    return filelist
     
 
 if __name__ == "__main__":

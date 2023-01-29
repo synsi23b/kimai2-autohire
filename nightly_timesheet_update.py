@@ -30,6 +30,11 @@ def update_breaktimes(employees:list[Angestellter], day:date):
         ma.update_breaktime(day)
 
 
+def insert_free_days_students(employees:list[Angestellter], day:date):
+    for ma in employees:
+        ma.fill_missing_freeday(day)
+
+
 def stop_overnight_timesheets(employees:list[Angestellter], day:date):
     mail_queue = []
     for ma in employees:
@@ -57,6 +62,7 @@ def run_corrections_for_yesterday():
     insert_public_holidays(empl + stud + schueler, day)
     insert_auto_worktime(empl + stud + schueler, day)
     stop_overnight_timesheets(empl + stud + schueler, day)
+    insert_free_days_students(stud + schueler, day)
     check_not_worked(empl, day)
     update_breaktimes(empl + stud + schueler, day)
 
@@ -105,6 +111,17 @@ def run_past_corrections_for_every_active_user():
             day = day + timedelta(days=1)
 
 
+def run_past_student_free_days_until(day:date):
+    empl = Angestellter.get_all_active("WERKSTUDENT")
+    empl += Angestellter.get_all_active("SCHUELERAUSHILFE")
+    for ma in empl:
+        # get user registering date
+        corday = ma.get_first_record_date()
+        while corday < day:
+            ma.fill_missing_freeday(corday)
+            corday += timedelta(days=1)
+
+
 if __name__ == "__main__":
     thisfile = Path(__file__)
     logging.basicConfig(filename=str(thisfile.parent.parent.resolve() / f"kimai2_autohire_{thisfile.stem}.log"),
@@ -112,4 +129,5 @@ if __name__ == "__main__":
 
     #run_past_corrections_for_every_active_user()
     #run_past_breaktimes()
+    #run_past_student_free_days_until(date(2023,1,28))
     run_corrections_for_yesterday()
