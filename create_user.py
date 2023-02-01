@@ -68,7 +68,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="onboard users either from csv or from command line")
     parser.add_argument("--file", dest="csvfile", default=None, help="Specify the file to create users from. If specified ignores other arguments.")
-    parser.add_argument("userdata", nargs="*", help=f"create user from command line: Firstname, Lastname, emailaddr, Usertype[{'|'.join(kimai_util.USER_TYPES.keys())}]")
+    parser.add_argument("userdata", nargs="*", help=f"create user from command line: Firstname, Lastname, Usertype[{'|'.join(kimai_util.USER_TYPES.keys())}], email address (defaults to first.last@l-i-t.com)")
     parser.add_argument("--inter", action="store_true", help="wether or not to run interactive expecting further inpunt default = not set")
 
     args = parser.parse_args()
@@ -84,9 +84,13 @@ if __name__ == "__main__":
         dic = {
             "firstname" : str(args.userdata[0]),
             "lastname": str(args.userdata[1]), 
-            "email": str(args.userdata[2]), 
-            "usertype": str(args.userdata[3])
+            "usertype": str(args.userdata[2]),
         }
+        try: 
+            dic["email"] = str(args.userdata[3])
+        except IndexError:
+            dic["email"] = f"{dic['firstname'].lower()}.{dic['lastname'].lower()}@leap-in-time.com"
+
         create_from_dic(dic, args.inter)
     else:
         parser.print_help()
