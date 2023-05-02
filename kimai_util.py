@@ -111,7 +111,7 @@ class Angestellter:
         self._alias = row[4]
         self._registration = row[6]
         self._preferences = db_util.get_user_preferences(self._id)
-        self._worktime_weekdays = [int(self._preferences[Angestellter.__vacationconfig[f"worktime_{idx}"]]) for idx in range(7)]
+        self._worktime_weekdays = [int(self._preferences.get(Angestellter.__vacationconfig[f"worktime_{idx}"], 0)) for idx in range(7)]
         if role != "ROLE_ADMIN":
             self._work_actis = Angestellter.__workingconfig[self._role]["work"]
             self._project = Angestellter.__workingconfig[self._role]["project"]

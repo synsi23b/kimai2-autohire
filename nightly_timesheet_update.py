@@ -53,8 +53,9 @@ def stop_overnight_timesheets(employees:list[Angestellter], day:date):
             send_mail(recv, "Automatisch gestopptes Timesheet", msg)
 
 
-def run_corrections_for_yesterday():
-    day = (datetime.utcnow() - timedelta(days=1)).date()
+def run_corrections_for_yesterday(day=None):
+    if day is None:
+        day = (datetime.utcnow() - timedelta(days=1)).date()
     logging.info(f"Running nightly corrections {day}")
     empl = Angestellter.get_all_active("ANGESTELLTER")
     stud = Angestellter.get_all_active("WERKSTUDENT")
@@ -65,6 +66,14 @@ def run_corrections_for_yesterday():
     insert_free_days_students(stud + schueler, day)
     check_not_worked(empl, day)
     update_breaktimes(empl + stud + schueler, day)
+
+
+def run_corrections_for_range(startday:date, endday:date=None):
+    if endday is None:
+        endday = (datetime.utcnow() - timedelta(days=1)).date()
+    while startday <= endday:
+        run_corrections_for_yesterday(startday)
+        startday += timedelta(days=1)
 
 
 def run_past_breaktimes():
@@ -130,4 +139,11 @@ if __name__ == "__main__":
     #run_past_corrections_for_every_active_user()
     #run_past_breaktimes()
     #run_past_student_free_days_until(date(2023,1,28))
-    run_corrections_for_yesterday()
+    ret = -1
+    try:
+        run_corrections_for_yesterday()
+        #run_corrections_for_range(date(2023, 2, 6))
+        ret = 0
+    except:
+        logging.exception("Exception during nightly run!")
+    exit(ret)
