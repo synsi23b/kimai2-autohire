@@ -455,7 +455,7 @@ def is_activity_deduction(activity_id):
     cnx = get_db()
     cur = cnx.cursor(buffered=True)
     cur.execute(f"SELECT value FROM kimai2_activities_meta WHERE activity_id = {activity_id} AND name ='is_deduction';")
-    res = list(cur)
+    res = list(cur)[0]
     return res[0] if res else 0
 
 
