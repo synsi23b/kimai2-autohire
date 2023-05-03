@@ -455,8 +455,11 @@ def is_activity_deduction(activity_id):
     cnx = get_db()
     cur = cnx.cursor(buffered=True)
     cur.execute(f"SELECT value FROM kimai2_activities_meta WHERE activity_id = {activity_id} AND name ='is_deduction';")
-    res = list(cur)[0]
-    return res[0] if res else 0
+    if cur.rowcount:
+        res = list(cur)[0]
+        return res[0] if res else 0
+    else:
+        return 0
 
 
 def insert_timesheet(user_id:int, activity_id:int, project_id:int, start:datetime, end:datetime, description:str, hourly_rate:float, exported:bool):

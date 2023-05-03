@@ -76,4 +76,5 @@ if __name__ == "__main__":
     #run_past_breaktime()
     #run_breaktime_update_90_days()
     #run_flextime_for_day(date(2022, 11, 23))
-    run_flextime_for_day(date(2022, 12, 19))
+    #run_flextime_for_day(date(2023, 2, 20))
+    run_flextime_for_day(date(2023, 3, 23))

@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 from datetime import date, timedelta, datetime
 from mail import send_mail
+import calendar
 
 
 def insert_public_holidays(employees:list[Angestellter], day:date):
@@ -66,6 +67,7 @@ def run_corrections_for_yesterday(day=None):
     insert_free_days_students(stud + schueler, day)
     check_not_worked(empl, day)
     update_breaktimes(empl + stud + schueler, day)
+    update_flextime(empl)
 
 
 def run_corrections_for_range(startday:date, endday:date=None):
@@ -129,6 +131,25 @@ def run_past_student_free_days_until(day:date):
         while corday < day:
             ma.fill_missing_freeday(corday)
             corday += timedelta(days=1)
+
+
+def update_flextime(employees:list[Angestellter]):
+    d = date.today()
+    c = calendar.Calendar(firstweekday=calendar.MONDAY)
+    monthcal = c.monthdatescalendar(d.year, d.month)
+    sundays = [day for week in monthcal for day in week if day.weekday() == calendar.SUNDAY and day.month == d.month]
+    secondlast_sunday = sundays[-2]
+    # only run on the second last sunday, else ignore
+    if d == secondlast_sunday:
+        # get last month and create the checkpoint on the monday after the previous second-to-last sunday
+        d = d - timedelta(days=-30)
+        monthcal = c.monthdatescalendar(d.year, d.month)
+        sundays = [day for week in monthcal for day in week if day.weekday() == calendar.SUNDAY and day.month == d.month]
+        secondlast_sunday = sundays[-2]
+        dayafter = secondlast_sunday + timedelta(days=1)
+        logging.info(f"Running flextime checkpoint for day: {dayafter}")
+        for ma in employees:
+            ma.update_flextime(dayafter)
 
 
 if __name__ == "__main__":
