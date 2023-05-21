@@ -142,7 +142,7 @@ def update_flextime(employees:list[Angestellter]):
     # only run on the second last sunday, else ignore
     if d == secondlast_sunday:
         # get last month and create the checkpoint on the monday after the previous second-to-last sunday
-        d = d - timedelta(days=-30)
+        d = d - timedelta(days=30)
         monthcal = c.monthdatescalendar(d.year, d.month)
         sundays = [day for week in monthcal for day in week if day.weekday() == calendar.SUNDAY and day.month == d.month]
         secondlast_sunday = sundays[-2]
