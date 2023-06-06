@@ -166,9 +166,12 @@ class Angestellter:
         if db_util.check_timesheet_exists(self._id, holidate, holitivity, holiname):
             logging.info(f"User: {self._user} has holiday {holiname} already set, skipping")
             return
-        # check user is actualy supposed to work on this day
-        # TODO wether or not students will get a time here. maybe always zero hours is best
-        workingtime = self._worktime_weekdays[holidate.weekday()]
+        # check user is actualy supposed to work on this day and insert the specific working time
+        # but only for fixed employees and not students
+        if self._role == "ANGESTELLTER":
+            workingtime = self._worktime_weekdays[holidate.weekday()]
+        else:
+            workingtime = 0
         #if workingtime == 0: # dont check, insert even 0 duration holidays just for display on the journal
         #    return
         # create start, end, duration
