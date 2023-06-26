@@ -265,7 +265,7 @@ class Timesheet:
     date_tz: date
 
 
-    def tzaware_start_end(self):
+    def tzaware_start_end(self) -> (datetime, datetime):
         tz = pytz.timezone(self.timezone)
         s = UTC.localize(self.start)
         e = UTC.localize(self.end)
@@ -295,18 +295,26 @@ def get_sheets_for_day(user_id:int, day:date, activities:list[int]) -> list[Time
 
 def calculate_timesheet_break_times(sheets:list[Timesheet]) ->  int:
     """
-    calculate break times taken between timesheets according to german law -> A break has a minimum of 15 minutes, else its not a break
+    calculate break times taken between timesheets according to german law.
+    A break has a minimum of 15 minutes, else its not a break
+    Additionally, if the start of work was in the morning, starting work again
+    During the late evening will not count towards the break times.
+    This is also to encourage propper break between days (Ruhepause[inter work ~45 Minutes] <-> Ruhezeit 11 hours!)
     """
     pause = 0
+    breaklist = []
     if len(sheets) > 1:
-        pairs = zip(sheets[:-1], sheets[1:])
-        for a, b in pairs:
+        day_start, _ = sheets[1].tzaware_start_end()
+        for a, b in zip(sheets[:-1], sheets[1:]):
             _, a_end = a.tzaware_start_end()
             b_start, _ = b.tzaware_start_end()
             interval = (b_start - a_end).total_seconds()
-            if interval >= (15 * 60):
+            if b_start.hour > 19 and interval >= 90 * 60:
+                breaklist.append(f"Not counting breaktime of {interval/60:.2f} minutes, started after 8 PM : {b_start:%H:%M}")
+            elif interval >= (15 * 60):
                 pause += interval
-    return pause    
+                breaklist.append(f"Took a break of {int(interval/60)} m : {a_end:%H:%M} -> {b_start:%H:%M}")
+    return pause, breaklist
 
 
 def get_student_holidays_taken(user_id:int) -> int:

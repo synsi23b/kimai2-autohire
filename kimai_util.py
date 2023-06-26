@@ -14,6 +14,7 @@ import pytz
 
 
 UTC = pytz.UTC
+MANUAL_BREAK_ID = 27
 
 
 dotenv.load_dotenv()
@@ -253,60 +254,56 @@ class Angestellter:
 
     
     def update_breaktime(self, day):
-        # check the total worktime is greater than 6 or 8 hours
-        # between 6 and 8 hours, 30 minutes break are neccessairy
-        # over 8 hours 1 hour break is neccessairy
+        # https://www.arbeitsrechte.de/pausenregelung/
+        # check the total worktime is within the german laws
+        # between 6 and 9 hours, 30 minutes break are neccessairy
+        # over 9 hours at least 45 Minutes
         # also calculate the times between individual sheets, if there is a break over 15 minutes, count it towards the forced break time
         sheets = db_util.get_sheets_for_day(self._id, day, self._work_actis)
         total_duration = sum([ts.duration for ts in sheets])
-        remaining_time = 0
-        if total_duration != 0 and self._role == "ANGESTELLTER":
+        required_break = 0
+        break_taken = 0
+        breaklist = []
+        if total_duration != 0:
             if total_duration > (6 * 60 * 60):
-                remaining_time = 1800
-            if total_duration > (8 * 60 * 60):
-                remaining_time = 3600
-        else:
-            if total_duration > (8 * 60 * 60):
-                # work over 8:00 hours -> minimum break time 3600s (1h)
-                break_times = db_util.calculate_timesheet_break_times(sheets)
-                remaining_time = 3600 - break_times
-            #elif total_duration > (6 * 60 * 60):
-                # work between 6:01 and 8:00 hours -> minimum break time 1800s (30min)
-            #    break_times = db_util.calculate_timesheet_break_times(sheets)
-            #    remaining_time = 1800 - break_times
+                required_break = 30 * 60
+            if total_duration > (9 * 60 * 60):
+                required_break = 45 * 60
+            break_taken, breaklist = db_util.calculate_timesheet_break_times(sheets)
+        remaining_time = required_break - break_taken
+        if remaining_time < 0:
+            remaining_time = 0
+        # create data for the break sheet, create a breaksheet for every day, even if its zero in duration, unless there was no work
+        break_start = datetime(day.year, day.month, day.day, tzinfo=UTC)
+        break_end = break_start + timedelta(seconds=remaining_time)
         # get breaksheet if it already exists to update instead of insert
-        breaksheet = db_util.get_sheets_for_day(self._id, day, [self._break_acti])
-        if breaksheet:
-            breaksheet = breaksheet[0]
-        if remaining_time > 0:
-            # have to insert a break of remaining_time seconds
-            if breaksheet and breaksheet.duration == -remaining_time:
-                # the current break time is the same as the exisiting one
-                return
-            # always use UTC 0 hour as start
-            # _, break_start = sheets[-1].tzaware_start_end()
-            # if break_start.date() != day:
-            #     # if appending the break at the end of the working time, make sure it is still the same day
-            #     # since it is not possible in this case, append the time at the start of the day
-            #     break_start = datetime(day.year, day.month, day.day, tzinfo=UTC)
-            break_start = datetime(day.year, day.month, day.day, tzinfo=UTC)
-            break_end = break_start + timedelta(seconds=remaining_time)
+        breaksheet = db_util.get_sheets_for_day(self._id, day, [self._break_acti, MANUAL_BREAK_ID])
+        if not breaksheet and total_duration > 0:
+            db_util.insert_timesheet(self._id, self._break_acti, self._project, break_start, break_end, "", 0, False)
+            breaksheet = db_util.get_sheets_for_day(self._id, day, [self._break_acti])
+        # delete breaksheets that are too much, we only need one
+        elif len(breaksheet) > 1:
+            for s in breaksheet[1:]:
+                db_util.timesheet_delete(s.id)
+        # resolve breaksheet list to actual sheet
+        if not breaksheet:
+            return
+        breaksheet = breaksheet[0]
+        # check if the person has working time at all for the day, only create a breaksheet in those cases
+        if total_duration == 0:
+            db_util.timesheet_delete(breaksheet.id)
+        else:
+            # update the existing timesheet with the calculation we did just now
             total_h = int(total_duration/3600)
             total_min = int(total_duration/60) - (total_h * 60)
-            if self._role == "ANGESTELLTER":
-                breakinfo = f"{datetime.utcnow():%Y-%m-%d %H:%M}: Arbeit: {total_h}:{total_min} -> Pause {remaining_time/60:.2f} min"
-            else:
-                breakinfo = f"{datetime.utcnow():%Y-%m-%d %H:%M}: Arbeit: {total_h}:{total_min} Pausen: {break_times/60:.2f} min"
-            if breaksheet:
-                logging.info(f"Updating mandatory break for user {self._email} on {day}: {remaining_time} seconds. {breakinfo}")
-                db_util.update_timesheet_times_description(breaksheet, break_start, break_end, f"{breakinfo}\n{breaksheet.description}")
-            else:
-                logging.info(f"Inserting mandatory break for user {self._email} on {day}: {remaining_time} seconds. {breakinfo}")
-                db_util.insert_timesheet(self._id, self._break_acti, self._project, break_start, break_end, breakinfo, 0, True)
-        else:
-            # dont have to insert a break, check if the breaksheet exists, than delete it
-            if breaksheet:
-                db_util.timesheet_delete(breaksheet.id)
+            if total_min < 10:
+                total_min = f"0{total_min}"
+            breakinfo = f"Generated at {datetime.utcnow():%Y-%m-%d %H:%M}; Working time {total_h}:{total_min} -> {int(required_break/60)} min break"
+            breaklist = "\n".join(breaklist)
+            if breaklist:
+                breakinfo = f"{breakinfo}\n{breaklist}"
+            logging.info(f"Updating break for user {self._email} on {day}: {remaining_time} seconds. {breakinfo}")
+            db_util.update_timesheet_times_description(breaksheet, break_start, break_end, f"{breakinfo}\n{breaksheet.description}")
 
 
     def update_flextime(self, day):
