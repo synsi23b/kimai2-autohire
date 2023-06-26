@@ -44,14 +44,10 @@ def stop_overnight_timesheets(employees:list[Angestellter], day:date):
             mail_queue.append(ma)
     if mail_queue:
         # create mail message and send to admins
-        admins_mails = [x._email for x in Angestellter.get_all_active("ROLE_ADMIN") if x.receive_admin_mails()]
+        admins_mails = [x._email for x in Angestellter.get_all_active("ROLE_ADMIN") if x.receive_admin_mails()] + [ "hr-admin@leap-in-time.com" ]
         for ma in mail_queue:
             msg = f"Guten morgen!\n\nHeute morgen wurde ein Timesheet von\n\n{ma._alias}\n\nautomatisch gestoppt.\nHier ein Admin-link zu allen Autostop Zeiten: https://worktime.leap-in-time.de/de/team/timesheet/?tags=Autostop \n\nBeim korrigieren das Schlagwort >Autostop< am besten entfernen, dann verschwindet der Eintrag auch aus dieser Zussammenfassung."
-            if ma._email in admins_mails:
-                recv = admins_mails
-            else:
-                recv = admins_mails + [ma._email]
-            send_mail(recv, "Automatisch gestopptes Timesheet", msg)
+            send_mail(set(admins_mails + [ma._email]), "Automatisch gestopptes Timesheet", msg)
 
 
 def run_corrections_for_yesterday(day=None):
